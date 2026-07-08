@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secretario de Agentes - Cádiz12</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }
+        h1 { color: #333; text-align: center; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        select, textarea, input[type="text"] { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        textarea { height: 80px; resize: vertical; }
+        button { background-color: #4CAF50; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #45a049; }
+        #logs { margin-top: 20px; border: 1px solid #ddd; padding: 15px; border-radius: 4px; background-color: #f9f9f9; max-height: 400px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; }
+        .error { color: red; }
+        .success { color: green; }
+        .log-entry { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Secretario de Agentes - Cádiz12</h1>
+        
+        <div class="form-group">
+            <label for="agente">Agente:</label>
+            <select id="agente">
+                <option value="">Selecciona un agente</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="mensaje">Mensaje:</label>
+            <textarea id="mensaje" placeholder="Escribe el mensaje para el agente..."></textarea>
+        </div>
+        
+        <button onclick="enviarMensaje()">Enviar Mensaje</button>
+        
+        <h2>Logs</h2>
+        <button onclick="cargarLogs()">Refrescar Logs</button>
+        <div id="logs">
+            <p>Cargando logs...</p>
+        </div>
+    </div>
+
+    <script>
+        async function cargarAgentes() {
+            try {
+                const response = await fetch('/api/v1/internal/agents');
+                if (!response.ok) throw new Error('No se pudo cargar los agentes');
+                const agentes = await response.json();
+                const select = document.getElementById('agente');
+                select.innerHTML = '<option value="">Selecciona un agente</option>';
+                agentes.forEach(agente => {
+                    const option = document.createElement('option');
+                    option.value = agente.id;
+                    option.textContent = agente.nombre;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error al cargar agentes:', error);
+                document.getElementById('agente').innerHTML = '<option value="">Error al cargar agentes</option>';
+            }
+        }
+
+        async function enviarMensaje() {
+            const agente = document.getElementById('agente').value;
+            const mensaje = document.getElementById('mensaje').value;
+            
+            if (!agente || !mensaje) {
+                alert('Por favor, selecciona un agente y escribe un mensaje.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/v1/internal/agents/' + encodeURIComponent(agente) + '/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: mensaje })
+                });
+                
+                const resultado = await response.json();
+                
+                const logsDiv = document.getElementById('logs');
+                const entry = document.createElement('div');
+                entry.className = 'log-entry ' + (resultado.status === 'success' ? 'success' : 'error');
+                entry.innerHTML = '<strong>[' + new Date().toLocaleTimeString() + ']</strong> ' + 
+                    document.getElementById('agente').options[document.getElementById('agente').selectedIndex].text + 
+                    ': ' + mensaje + '<br>Respuesta: ' + JSON.stringify(resultado);
+                logsDiv.prepend(entry);
+                
+                document.getElementById('mensaje').value = '';
+            } catch (error) {
+                console.error('Error al enviar mensaje:', error);
+                alert('Error al enviar el mensaje.');
+            }
+        }
+
+        async function cargarLogs() {
+            try {
+                const response = await fetch('/api/v1/internal/logs');
+                if (!response.ok) throw new Error('No se pudo cargar los logs');
+                const logs = await response.json();
+                
+                const logsDiv = document.getElementById('logs');
+                logsDiv.innerHTML = '';
+                
+                if (logs.length === 0) {
+                    logsDiv.innerHTML = '<p>No hay logs disponibles.</p>';
+                    return;
+                }
+                
+                logs.slice().reverse().forEach(log => {
+                    const entry = document.createElement('div');
+                    entry.className = 'log-entry ' + (log.tipo === 'error' ? 'error' : 'success');
+                    entry.innerHTML = '<strong>[' + log.timestamp + ']</strong> ' + log.agente + ': ' + log.entrada + '<br>Salida: ' + JSON.stringify(log.salida);
+                    logsDiv.appendChild(entry);
+                });
+            } catch (error) {
+                console.error('Error al cargar logs:', error);
+                document.getElementById('logs').innerHTML = '<p class="error">Error al cargar logs.</p>';
+            }
+        }
+
+        window.onload = function() {
+            cargarAgentes();
+            cargarLogs();
+        };
+    </script>
+</body>
+</html>
