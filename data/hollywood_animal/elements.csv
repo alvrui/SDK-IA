@@ -1,2 +1,3 @@
 id,category,subtype,narrative_scale,tone_serious,tone_comic,tone_grim,tone_adventurous,tone_melodramatic,tone_pulpy,moral_idealist,moral_cynical,moral_corrupt,moral_redemptive,moral_lawful,moral_chaotic,realism_grounded,realism_heightened,realism_fantastical,realism_supernatural,realism_sci_fi,agency_type,core_drives,content_flags,genre_affinity,setting_affinity
 ACCIDENTAL_HERO,protagonist,heroic_archetype,personal,0.6,0.2,0.2,0.7,0.3,0.1,0.8,0.2,0.0,0.6,0.7,0.3,active,justice;survival,,adventure;drama,modern;historical;fantasy
+AMBITIOUS_WOMAN,protagonist,social_challenger,personal,0.7,0.1,0.1,0.3,0.4,0.1,0.6,0.3,0.0,0.5,0.4,0.6,active,power;freedom;justice,,drama;romance,modern;historical
