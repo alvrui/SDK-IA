@@ -55,25 +55,3 @@ impl CompatibilityMatrix {
             explanation,
         })
     }
-    
-    pub fn calculate_axis_score(&self, axis: &str, a: &HollywoodElement, b: &HollywoodElement) -> f32 {
-        match axis {
-            "role_complementarity" => self.role_complementarity(a, b),
-            "moral_tension" => self.moral_tension(a, b),
-            "tone_alignment" => self.tone_alignment(a, b),
-            "scale_alignment" => self.scale_alignment(a, b),
-            "genre_support" => self.genre_support(a, b),
-            "setting_fit" => self.setting_fit(a, b),
-            "arc_coherence" => self.arc_coherence(a, b),
-            "embodiment_strength" => self.embodiment_strength(a, b),
-            "arc_payoff" => self.arc_payoff(a, b),
-            "core_drives_overlap" => self.core_drives_overlap(a, b),
-            "moral_alignment" => self.moral_alignment(a, b),
-            "moral_coherence" => self.moral_coherence(a, b),
-            "natural_fit" => self.natural_fit(a, b),
-            "reinterpretation_fit" => self.reinterpretation_fit(a, b),
-            "novelty_bonus" => self.novelty_bonus(a, b),
-            "sensitivity_risk" => self.sensitivity_risk(a, b),
-            _ => 0.5,
-        }
-    }
