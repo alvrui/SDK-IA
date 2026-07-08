@@ -1,0 +1,4 @@
+/* CSS Variables for theming */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
