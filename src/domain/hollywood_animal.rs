@@ -210,7 +210,11 @@ impl CompatibilityMatrix {
         }
     }
     
-    pub fn load_from_csv(&mut self, elements_path: &str, rules_path: &str) -> Result<(), String> {
+    pub fn load_from_csv(
+        &mut self, 
+        elements_path: &str, 
+        rules_path: &str
+    ) -> Result<(), String> {
         let mut rdr = csv::Reader::from_path(elements_path)
             .map_err(|e| format!("Error reading elements.csv: {}", e))?;
         
@@ -225,11 +229,17 @@ impl CompatibilityMatrix {
         
         for result in rdr.records() {
             let row = result.map_err(|e| format!("CSV error: {}", e))?;
-            let pair_type = row.get("pair_type").ok_or("Missing pair_type")?.to_string();
-            let axis = row.get("axis").ok_or("Missing axis")?.to_string();
-            let weight: f32 = row.get("weight").ok_or("Missing weight")?.parse()
+            let pair_type = row.get("pair_type")
+                .ok_or("Missing pair_type")?.to_string();
+            let axis = row.get("axis")
+                .ok_or("Missing axis")?.to_string();
+            let weight: f32 = row.get("weight")
+                .ok_or("Missing weight")?.parse()
                 .map_err(|e| format!("Invalid weight: {}", e))?;
-            self.rules.entry(pair_type).or_insert_with(HashMap::new).insert(axis, weight);
+            
+            self.rules.entry(pair_type)
+                .or_insert_with(HashMap::new)
+                .insert(axis, weight);
         }
         
         Ok(())
