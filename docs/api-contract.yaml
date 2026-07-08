@@ -1,0 +1,107 @@
+openapi: 3.0.0
+info:
+  title: API Interna SDK-IA
+  description: Contrato de API interna para comunicacion entre modulos Secretario (Python) y SDK (Rust)
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:9000/api/v1
+    description: Servicio Secretario (Python)
+  - url: http://localhost:9090/api/v1
+    description: Servicio SDK (Rust)
+
+tags:
+  - name: Secretario
+    description: Operaciones del modulo Secretario (Python)
+  - name: SDK
+    description: Operaciones del modulo SDK (Rust)
+
+paths:
+  /internal/agents:
+    get:
+      tags: [Secretario]
+      summary: Listar agentes
+      responses:
+        '200':
+          description: Lista de agentes
+    post:
+      tags: [Secretario]
+      summary: Crear agente
+      responses:
+        '201':
+          description: Agente creado
+
+  /internal/agents/{name}:
+    get:
+      tags: [Secretario]
+      summary: Obtener agente
+    delete:
+      tags: [Secretario]
+      summary: Eliminar agente
+
+  /internal/agents/{name}/message:
+    post:
+      tags: [Secretario]
+      summary: Enviar mensaje a agente
+      responses:
+        '200':
+          description: Respuesta del agente
+
+  /internal/agents/{name}/conversation:
+    get:
+      tags: [Secretario]
+      summary: Obtener conversacion
+
+  /internal/agents/{name}/conversation/reset:
+    post:
+      tags: [Secretario]
+      summary: Reiniciar conversacion
+
+  /internal/logs:
+    get:
+      tags: [Secretario]
+      summary: Listar logs
+
+  /internal/health:
+    get:
+      tags: [Secretario]
+      summary: Estado de salud Secretario
+
+  /internal/projects:
+    get:
+      tags: [SDK]
+      summary: Listar proyectos
+    post:
+      tags: [SDK]
+      summary: Crear proyecto
+
+  /internal/projects/{id}:
+    get:
+      tags: [SDK]
+      summary: Obtener proyecto
+    put:
+      tags: [SDK]
+      summary: Actualizar proyecto
+    delete:
+      tags: [SDK]
+      summary: Eliminar proyecto
+
+  /internal/projects/{id}/validate:
+    post:
+      tags: [SDK]
+      summary: Validar proyecto
+
+  /internal/catalog/{type}:
+    get:
+      tags: [SDK]
+      summary: Obtener catalogo
+
+  /internal/generate:
+    post:
+      tags: [SDK]
+      summary: Generar contenido
+
+  /internal/health:
+    get:
+      tags: [SDK]
+      summary: Estado de salud SDK
