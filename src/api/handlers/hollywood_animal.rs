@@ -1,7 +1,8 @@
-use actix_web::{web, HttpResponse, Responder};
+use actix_web::{web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use crate::domain::hollywood_animal::{CompatibilityMatrix, CompatibilityResult, HollywoodElement, ElementCategory};
+use crate::domain::hollywood_animal::{CompatibilityMatrix, CompatibilityResult, HollywoodElement};
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CompatibilityQuery {
@@ -29,20 +30,19 @@ pub struct SearchQuery {
 
 pub async fn get_hollywood_elements(
     matrix: web::Data<Arc<CompatibilityMatrix>>,
-) -> impl Responder {
+) -> HttpResponse {
     let elements: Vec<&HollywoodElement> = matrix.elements.values().collect();
-    let mut categories: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut counts: HashMap<String, usize> = HashMap::new();
     for elem in matrix.elements.values() {
         let cat = format!("{:?}", elem.category);
-        *categories.entry(cat).or_insert(0) += 1;
+        *counts.entry(cat).or_insert(0) += 1;
     }
-    
     HttpResponse::Ok().json(serde_json::json!({
         "status": "success",
         "data": elements,
         "meta": {
             "count": elements.len(),
-            "categories": categories
+            "categories": counts
         }
     }))
 }
@@ -50,7 +50,7 @@ pub async fn get_hollywood_elements(
 pub async fn get_hollywood_element(
     matrix: web::Data<Arc<CompatibilityMatrix>>,
     id: web::Path<String>,
-) -> impl Responder {
+) -> HttpResponse {
     match matrix.elements.get(&id.into_inner()) {
         Some(element) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
@@ -63,53 +63,10 @@ pub async fn get_hollywood_element(
     }
 }
 
-pub async fn get_elements_by_category(
-    matrix: web::Data<Arc<CompatibilityMatrix>>,
-    category: web::Path<String>,
-) -> impl Responder {
-    match category.parse::<ElementCategory>() {
-        Ok(cat) => {
-            let elements: Vec<&HollywoodElement> = matrix.elements.values()
-                .filter(|e| e.category == cat)
-                .collect();
-            HttpResponse::Ok().json(serde_json::json!({
-                "status": "success",
-                "data": elements,
-                "meta": {
-                    "category": format!("{:?}", cat),
-                    "count": elements.len()
-                }
-            }))
-        }
-        Err(_) => HttpResponse::BadRequest().json(serde_json::json!({
-            "status": "error",
-            "error": format!("Invalid category: {}", category.into_inner())
-        })),
-    }
-}
-
-pub async fn search_elements(
-    matrix: web::Data<Arc<CompatibilityMatrix>>,
-    query: web::Query<SearchQuery>,
-) -> impl Responder {
-    let search_term = query.q.to_lowercase();
-    let results: Vec<&HollywoodElement> = matrix.elements.values()
-        .filter(|e| e.id.to_lowercase().contains(&search_term))
-        .collect();
-    HttpResponse::Ok().json(serde_json::json!({
-        "status": "success",
-        "data": results,
-        "meta": {
-            "search_term": query.q,
-            "count": results.len()
-        }
-    }))
-}
-
 pub async fn get_compatibility(
     matrix: web::Data<Arc<CompatibilityMatrix>>,
     query: web::Query<CompatibilityQuery>,
-) -> impl Responder {
+) -> HttpResponse {
     match matrix.calculate_compatibility(
         &query.element_a, 
         &query.element_b, 
@@ -129,7 +86,7 @@ pub async fn get_compatibility(
 pub async fn batch_compatibility(
     matrix: web::Data<Arc<CompatibilityMatrix>>,
     payload: web::Json<BatchCompatibilityRequest>,
-) -> impl Responder {
+) -> HttpResponse {
     let mut results: Vec<Result<CompatibilityResult, String>> = Vec::new();
     for pair in &payload.pairs {
         if pair.len() != 2 {
@@ -155,7 +112,7 @@ pub async fn batch_compatibility(
 pub async fn get_set_compatibility(
     matrix: web::Data<Arc<CompatibilityMatrix>>,
     query: web::Query<SetCompatibilityQuery>,
-) -> impl Responder {
+) -> HttpResponse {
     match matrix.calculate_set_compatibility(&query.elements, query.preset.as_deref()) {
         Ok(scores) => HttpResponse::Ok().json(serde_json::json!({
             "status": "success",
@@ -166,6 +123,50 @@ pub async fn get_set_compatibility(
             "error": e
         })),
     }
+}
+
+pub async fn get_elements_by_category(
+    matrix: web::Data<Arc<CompatibilityMatrix>>,
+    category: web::Path<String>,
+) -> HttpResponse {
+    use std::str::FromStr as _;
+    match category.parse::<crate::domain::hollywood_animal::ElementCategory>() {
+        Ok(cat) => {
+            let elements: Vec<&HollywoodElement> = matrix.elements.values()
+                .filter(|e| e.category == cat)
+                .collect();
+            HttpResponse::Ok().json(serde_json::json!({
+                "status": "success",
+                "data": elements,
+                "meta": {
+                    "category": format!("{:?}", cat),
+                    "count": elements.len()
+                }
+            }))
+        }
+        Err(_) => HttpResponse::BadRequest().json(serde_json::json!({
+            "status": "error",
+            "error": format!("Invalid category: {}", category.into_inner())
+        })),
+    }
+}
+
+pub async fn search_elements(
+    matrix: web::Data<Arc<CompatibilityMatrix>>,
+    query: web::Query<SearchQuery>,
+) -> HttpResponse {
+    let search_term = query.q.to_lowercase();
+    let results: Vec<&HollywoodElement> = matrix.elements.values()
+        .filter(|e| e.id.to_lowercase().contains(&search_term))
+        .collect();
+    HttpResponse::Ok().json(serde_json::json!({
+        "status": "success",
+        "data": results,
+        "meta": {
+            "search_term": query.q,
+            "count": results.len()
+        }
+    }))
 }
 
 pub fn configure_hollywood_animal_routes(cfg: &mut web::ServiceConfig) {
