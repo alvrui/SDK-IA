@@ -1,35 +1,51 @@
 [package]
-name = "sdk-ia"
+name = "SDK-IA"
 version = "0.1.0"
 edition = "2021"
 authors = ["alvrui"]
-description = "SDK for Cadiz12 project - Rust backend for narrative and event generation"
+description = "Unified application for AI-assisted narrative generation with Hollywood Animal compatibility matrix"
 
 [dependencies]
 # Web framework
-actix-web = "4.0"
-actix-rt = "2.0"
+actix-web = "4"
+actix-rt = "2"
+actix-cors = "0.7"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-# Async runtime
-tokio = { version = "1.0", features = ["full"] }
-
-# HTTP client for internal communication
-reqwest = { version = "0.11", features = ["json"] }
+# CSV parsing
+csv = "1.3"
 
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# Async
+tokio = { version = "1.0", features = ["full"] }
+
+# UUID
+uuid = { version = "1.4", features = ["v4", "serde"] }
+
+# Chrono for dates
+chrono = { version = "0.4", features = ["serde"] }
+
+# SQLite
+rusqlite = { version = "0.29", features = ["bundled"] }
+
+# HTTP client
+reqwest = { version = "0.11", features = ["json"] }
+
 # Configuration
 config = "0.13"
 
-# Error handling
-thiserror = "1.0"
-anyhow = "1.0"
-
 [dev-dependencies]
-actix-rt = "2.0"
+
+[profile.release]
+opt-level = 2
+lto = true
+codegen-units = 1
+
+[profile.dev]
+opt-level = 1
