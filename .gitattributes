@@ -1,0 +1,45 @@
+# Line endings
+* text=auto
+
+# Rust files
+*.rs text eol=lf
+Cargo.toml text eol=lf
+Cargo.lock text eol=lf
+
+# Python files
+*.py text eol=lf
+pyproject.toml text eol=lf
+requirements.txt text eol=lf
+
+# JavaScript/TypeScript files
+*.js text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+package.json text eol=lf
+
+# HTML/CSS
+*.html text eol=lf
+*.css text eol=lf
+
+# Markdown
+*.md text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+Makefile text eol=lf
+
+# SQLite databases
+*.db binary
+*.sqlite binary
+
+# Logs
+*.log text eol=lf
+
+# IDE/Editor files
+.idea/ -merge=union
+.vscode/ -merge=union
+
+# OS files
+.DS_Store -merge=union
+Thumbs.db -merge=union
