@@ -1,0 +1,35 @@
+[package]
+name = "sdk-ia"
+version = "0.1.0"
+edition = "2021"
+authors = ["alvrui"]
+description = "SDK for Cadiz12 project - Rust backend for narrative and event generation"
+
+[dependencies]
+# Web framework
+actix-web = "4.0"
+actix-rt = "2.0"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# HTTP client for internal communication
+reqwest = { version = "0.11", features = ["json"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Configuration
+config = "0.13"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+[dev-dependencies]
+actix-rt = "2.0"
