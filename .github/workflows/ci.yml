@@ -1,0 +1,67 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.5"
+      
+      - name: Install Python dependencies
+        run: |
+          cd python
+          pip install -e .[dev]
+      
+      - name: Run Python tests
+        run: |
+          cd python
+          pytest secreto/tests/ -v
+      
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: 1.96
+          components: rustfmt, clippy
+      
+      - name: Run Rust tests
+        run: |
+          cd src
+          cargo test --all-targets --all-features
+      
+      - name: Run Clippy
+        run: |
+          cd src
+          cargo clippy --all-targets --all-features -D warnings
+      
+      - name: Run Rust formatting check
+        run: |
+          cd src
+          cargo fmt --check
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      
+      - name: Install UI dependencies
+        run: |
+          cd ui
+          npm ci
+      
+      - name: Run UI linting
+        run: |
+          cd ui
+          npm run lint
