@@ -1,4 +1,4 @@
-// Routes configuration
+// API routes configuration
 use actix_web::web;
 use crate::api::handlers::hollywood_animal::configure_hollywood_animal_routes;
 
