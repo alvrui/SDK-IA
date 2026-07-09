@@ -5,7 +5,7 @@ use crate::domain::{Project, Narrative, StoryElement, GameEvent, ProjectStatus, 
 use rusqlite::{Connection, Result, params, Row};
 use std::path::Path;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, FixedOffset};
 use serde_json;
 
 pub struct PersistenceService {
@@ -17,7 +17,7 @@ impl PersistenceService {
     pub fn new(database_path: &str) -> Result<Self> {
         let path = Path::new(database_path);
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
+            std::fs::create_dir_all(parent).map_err(|e| rusqlite::Error::from(e))?;
         }
         let conn = Connection::open(database_path)?;
         Self::initialize_database(&conn)?;
@@ -140,6 +140,19 @@ impl PersistenceService {
         Ok(project.id)
     }
 
+    /// Helper function to parse DateTime from RFC3339 string and convert to Utc
+    fn parse_datetime_utc(s: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(s)
+            .map(|dt: DateTime<FixedOffset>| dt.with_timezone(&Utc))
+            .unwrap_or_else(|_| Utc::now())
+    }
+
+    /// Helper function to parse optional DateTime from RFC3339 string and convert to Utc
+    fn parse_optional_datetime_utc(s: Option<String>) -> Option<DateTime<Utc>> {
+        s.and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
+            .map(|dt: DateTime<FixedOffset>| dt.with_timezone(&Utc))
+    }
+
     /// Get a project by ID
     pub fn get_project(&self, id: &Uuid) -> Result<Option<Project>> {
         let mut stmt = self.conn.prepare(
@@ -153,10 +166,10 @@ impl PersistenceService {
                 name: row.get(1)?,
                 description: row.get(2)?,
                 author: row.get(3)?,
-                created_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(4)?).unwrap_or(Utc::now()),
-                updated_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(5)?).unwrap_or(Utc::now()),
+                created_at: Self::parse_datetime_utc(&row.get::<_, String>(4)?),
+                updated_at: Self::parse_datetime_utc(&row.get::<_, String>(5)?),
                 version: row.get(6)?,
-                status: serde_json::from_str(&format!(""{:?}"", row.get::<_, String>(7)?)).unwrap_or(ProjectStatus::Draft),
+                status: serde_json::from_str(&format!("{:?}", row.get::<_, String>(7)?)).unwrap_or(ProjectStatus::Draft),
                 tags: serde_json::from_str(&row.get::<_, String>(8)?).unwrap_or_default(),
                 settings: serde_json::from_str(&row.get::<_, String>(9)?).unwrap_or_default(),
                 metadata: serde_json::from_str(&row.get::<_, String>(10)?).unwrap_or_default(),
@@ -185,10 +198,10 @@ impl PersistenceService {
                 name: row.get(1)?,
                 description: row.get(2)?,
                 author: row.get(3)?,
-                created_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(4)?).unwrap_or(Utc::now()),
-                updated_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(5)?).unwrap_or(Utc::now()),
+                created_at: Self::parse_datetime_utc(&row.get::<_, String>(4)?),
+                updated_at: Self::parse_datetime_utc(&row.get::<_, String>(5)?),
                 version: row.get(6)?,
-                status: serde_json::from_str(&format!(""{:?}"", row.get::<_, String>(7)?)).unwrap_or(ProjectStatus::Draft),
+                status: serde_json::from_str(&format!("{:?}", row.get::<_, String>(7)?)).unwrap_or(ProjectStatus::Draft),
                 tags: serde_json::from_str(&row.get::<_, String>(8)?).unwrap_or_default(),
                 settings: serde_json::from_str(&row.get::<_, String>(9)?).unwrap_or_default(),
                 metadata: serde_json::from_str(&row.get::<_, String>(10)?).unwrap_or_default(),
@@ -231,7 +244,7 @@ impl PersistenceService {
 
     /// Delete a project and all its related data (cascade delete)
     pub fn delete_project(&self, id: &Uuid) -> Result<()> {
-        let tx = self.conn.transaction()?;
+        let mut tx = self.conn.transaction()?;
         
         // Delete game events
         tx.execute("DELETE FROM game_events WHERE narrative_id IN (SELECT id FROM narratives WHERE project_id = ?1)", params![id.to_string()])?;
@@ -300,9 +313,9 @@ impl PersistenceService {
                 project_id: Uuid::parse_str(row.get::<_, String>(1)?.as_str()).unwrap(),
                 title: row.get(2)?,
                 synopsis: row.get(3)?,
-                status: serde_json::from_str(&format!(""{:?}"", row.get::<_, String>(4)?)).unwrap_or(NarrativeStatus::Outline),
-                created_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(5)?).unwrap_or(Utc::now()),
-                updated_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(6)?).unwrap_or(Utc::now()),
+                status: serde_json::from_str(&format!("{:?}", row.get::<_, String>(4)?)).unwrap_or(NarrativeStatus::Outline),
+                created_at: Self::parse_datetime_utc(&row.get::<_, String>(5)?),
+                updated_at: Self::parse_datetime_utc(&row.get::<_, String>(6)?),
                 version: row.get(7)?,
                 theme_ids: serde_json::from_str(&row.get::<_, String>(8)?).unwrap_or_default(),
                 compatibility_score: row.get(9)?,
@@ -332,9 +345,9 @@ impl PersistenceService {
                 project_id: Uuid::parse_str(row.get::<_, String>(1)?.as_str()).unwrap(),
                 title: row.get(2)?,
                 synopsis: row.get(3)?,
-                status: serde_json::from_str(&format!(""{:?}"", row.get::<_, String>(4)?)).unwrap_or(NarrativeStatus::Outline),
-                created_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(5)?).unwrap_or(Utc::now()),
-                updated_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(6)?).unwrap_or(Utc::now()),
+                status: serde_json::from_str(&format!("{:?}", row.get::<_, String>(4)?)).unwrap_or(NarrativeStatus::Outline),
+                created_at: Self::parse_datetime_utc(&row.get::<_, String>(5)?),
+                updated_at: Self::parse_datetime_utc(&row.get::<_, String>(6)?),
                 version: row.get(7)?,
                 theme_ids: serde_json::from_str(&row.get::<_, String>(8)?).unwrap_or_default(),
                 compatibility_score: row.get(9)?,
@@ -378,7 +391,7 @@ impl PersistenceService {
 
     /// Delete a narrative and all its related data
     pub fn delete_narrative(&self, id: &Uuid) -> Result<()> {
-        let tx = self.conn.transaction()?;
+        let mut tx = self.conn.transaction()?;
         
         tx.execute("DELETE FROM game_events WHERE narrative_id = ?1", params![id.to_string()])?;
         tx.execute("DELETE FROM story_elements WHERE narrative_id = ?1", params![id.to_string()])?;
@@ -423,12 +436,12 @@ impl PersistenceService {
             Ok(StoryElement {
                 id: Uuid::parse_str(row.get::<_, String>(0)?.as_str()).unwrap_or(*id),
                 narrative_id: Uuid::parse_str(row.get::<_, String>(1)?.as_str()).unwrap(),
-                element_type: serde_json::from_str(&format!(""{:?}"", row.get::<_, String>(2)?)).unwrap_or(StoryElementType::Protagonist),
+                element_type: serde_json::from_str(&format!("{:?}", row.get::<_, String>(2)?)).unwrap_or(StoryElementType::Protagonist),
                 hollywood_element_id: row.get(3)?,
                 name: row.get(4)?,
                 description: row.get(5)?,
                 attributes: serde_json::from_str(&row.get::<_, String>(6)?).unwrap_or_default(),
-                created_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(7)?).unwrap_or(Utc::now()),
+                created_at: Self::parse_datetime_utc(&row.get::<_, String>(7)?),
                 compatibility_score: row.get(8)?,
             })
         })?;
@@ -452,12 +465,12 @@ impl PersistenceService {
             Ok(StoryElement {
                 id: Uuid::parse_str(row.get::<_, String>(0)?.as_str()).unwrap(),
                 narrative_id: Uuid::parse_str(row.get::<_, String>(1)?.as_str()).unwrap(),
-                element_type: serde_json::from_str(&format!(""{:?}"", row.get::<_, String>(2)?)).unwrap_or(StoryElementType::Protagonist),
+                element_type: serde_json::from_str(&format!("{:?}", row.get::<_, String>(2)?)).unwrap_or(StoryElementType::Protagonist),
                 hollywood_element_id: row.get(3)?,
                 name: row.get(4)?,
                 description: row.get(5)?,
                 attributes: serde_json::from_str(&row.get::<_, String>(6)?).unwrap_or_default(),
-                created_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(7)?).unwrap_or(Utc::now()),
+                created_at: Self::parse_datetime_utc(&row.get::<_, String>(7)?),
                 compatibility_score: row.get(8)?,
             })
         })?;
@@ -482,12 +495,12 @@ impl PersistenceService {
             Ok(StoryElement {
                 id: Uuid::parse_str(row.get::<_, String>(0)?.as_str()).unwrap(),
                 narrative_id: Uuid::parse_str(row.get::<_, String>(1)?.as_str()).unwrap(),
-                element_type: serde_json::from_str(&format!(""{:?}"", row.get::<_, String>(2)?)).unwrap_or(element_type),
+                element_type: serde_json::from_str(&format!("{:?}", row.get::<_, String>(2)?)).unwrap_or(element_type),
                 hollywood_element_id: row.get(3)?,
                 name: row.get(4)?,
                 description: row.get(5)?,
                 attributes: serde_json::from_str(&row.get::<_, String>(6)?).unwrap_or_default(),
-                created_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(7)?).unwrap_or(Utc::now()),
+                created_at: Self::parse_datetime_utc(&row.get::<_, String>(7)?),
                 compatibility_score: row.get(8)?,
             })
         })?;
@@ -575,7 +588,7 @@ impl PersistenceService {
             Ok(GameEvent {
                 id: Uuid::parse_str(row.get::<_, String>(0)?.as_str()).unwrap_or(*id),
                 narrative_id: Uuid::parse_str(row.get::<_, String>(1)?.as_str()).unwrap(),
-                event_type: serde_json::from_str(&format!(""{:?}"", row.get::<_, String>(2)?)).unwrap_or(EventType::Scene),
+                event_type: serde_json::from_str(&format!("{:?}", row.get::<_, String>(2)?)).unwrap_or(EventType::Scene),
                 title: row.get(3)?,
                 description: row.get(4)?,
                 text: row.get(5)?,
@@ -583,11 +596,11 @@ impl PersistenceService {
                 location_ids: serde_json::from_str(&row.get::<_, String>(7)?).unwrap_or_default(),
                 images: serde_json::from_str(&row.get::<_, String>(8)?).unwrap_or_default(),
                 hollywood_event_id: row.get::<_, Option<String>>(9)?,
-                timestamp: row.get::<_, Option<String>>(10)?.and_then(|s| DateTime::parse_from_rfc3339(&s).ok()),
+                timestamp: Self::parse_optional_datetime_utc(row.get::<_, Option<String>>(10)?),
                 order_index: row.get(11)?,
                 attributes: serde_json::from_str(&row.get::<_, String>(12)?).unwrap_or_default(),
-                created_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(13)?).unwrap_or(Utc::now()),
-                updated_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(14)?).unwrap_or(Utc::now()),
+                created_at: Self::parse_datetime_utc(&row.get::<_, String>(13)?),
+                updated_at: Self::parse_datetime_utc(&row.get::<_, String>(14)?),
             })
         })?;
         
@@ -610,7 +623,7 @@ impl PersistenceService {
             Ok(GameEvent {
                 id: Uuid::parse_str(row.get::<_, String>(0)?.as_str()).unwrap(),
                 narrative_id: Uuid::parse_str(row.get::<_, String>(1)?.as_str()).unwrap(),
-                event_type: serde_json::from_str(&format!(""{:?}"", row.get::<_, String>(2)?)).unwrap_or(EventType::Scene),
+                event_type: serde_json::from_str(&format!("{:?}", row.get::<_, String>(2)?)).unwrap_or(EventType::Scene),
                 title: row.get(3)?,
                 description: row.get(4)?,
                 text: row.get(5)?,
@@ -618,11 +631,11 @@ impl PersistenceService {
                 location_ids: serde_json::from_str(&row.get::<_, String>(7)?).unwrap_or_default(),
                 images: serde_json::from_str(&row.get::<_, String>(8)?).unwrap_or_default(),
                 hollywood_event_id: row.get::<_, Option<String>>(9)?,
-                timestamp: row.get::<_, Option<String>>(10)?.and_then(|s| DateTime::parse_from_rfc3339(&s).ok()),
+                timestamp: Self::parse_optional_datetime_utc(row.get::<_, Option<String>>(10)?),
                 order_index: row.get(11)?,
                 attributes: serde_json::from_str(&row.get::<_, String>(12)?).unwrap_or_default(),
-                created_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(13)?).unwrap_or(Utc::now()),
-                updated_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(14)?).unwrap_or(Utc::now()),
+                created_at: Self::parse_datetime_utc(&row.get::<_, String>(13)?),
+                updated_at: Self::parse_datetime_utc(&row.get::<_, String>(14)?),
             })
         })?;
         
@@ -707,7 +720,7 @@ impl PersistenceService {
         if let Some(tags) = tags {
             for (i, tag) in tags.iter().enumerate() {
                 conditions.push(format!("tags LIKE ?{}", i + 4));
-                params.push(Box::new(format!("%"{}"%", tag)));
+                params.push(Box::new(format!("%"{}"", tag)));
             }
         }
 
@@ -728,10 +741,10 @@ impl PersistenceService {
                 name: row.get(1)?,
                 description: row.get(2)?,
                 author: row.get(3)?,
-                created_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(4)?).unwrap_or(Utc::now()),
-                updated_at: DateTime::parse_from_rfc3339(&row.get::<_, String>(5)?).unwrap_or(Utc::now()),
+                created_at: Self::parse_datetime_utc(&row.get::<_, String>(4)?),
+                updated_at: Self::parse_datetime_utc(&row.get::<_, String>(5)?),
                 version: row.get(6)?,
-                status: serde_json::from_str(&format!(""{:?}"", row.get::<_, String>(7)?)).unwrap_or(ProjectStatus::Draft),
+                status: serde_json::from_str(&format!("{:?}", row.get::<_, String>(7)?)).unwrap_or(ProjectStatus::Draft),
                 tags: serde_json::from_str(&row.get::<_, String>(8)?).unwrap_or_default(),
                 settings: serde_json::from_str(&row.get::<_, String>(9)?).unwrap_or_default(),
                 metadata: serde_json::from_str(&row.get::<_, String>(10)?).unwrap_or_default(),
@@ -772,7 +785,7 @@ impl PersistenceService {
         if let Some(tags) = tags {
             for (i, tag) in tags.iter().enumerate() {
                 conditions.push(format!("tags LIKE ?{}", i + 4));
-                params.push(Box::new(format!("%"{}"%", tag)));
+                params.push(Box::new(format!("%"{}"", tag)));
             }
         }
 
