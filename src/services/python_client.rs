@@ -33,30 +33,15 @@ pub enum PythonClientError {
     SerdeError(#[from] serde_json::Error),
 }
 
-impl std::fmt::Display for PythonClientError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PythonClientError::RequestFailed(e) => write!(f, "Request failed: {}", e),
-            PythonClientError::InvalidResponse(e) => write!(f, "Invalid response: {}", e),
-            PythonClientError::AgentNotFound(e) => write!(f, "Agent not found: {}", e),
-            PythonClientError::Timeout(e) => write!(f, "Timeout: {}", e),
-            PythonClientError::IoError(e) => write!(f, "IO error: {}", e),
-            PythonClientError::ReqwestError(e) => write!(f, "Reqwest error: {}", e),
-            PythonClientError::SerdeError(e) => write!(f, "Serde JSON error: {}", e),
-        }
-    }
-}
-
 /// Client for communicating with the Python Secretario service
 pub struct PythonClient {
     client: Client,
     base_url: String,
-    config: AppConfig,
 }
 
 impl PythonClient {
-    /// Create a new Python client
-    pub fn new(config: AppConfig) -> Self {
+    /// Create a new Python client with a base URL
+    pub fn new(base_url: &str) -> Self {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
@@ -64,9 +49,13 @@ impl PythonClient {
         
         Self {
             client,
-            base_url: config.python_service_url,
-            config,
+            base_url: base_url.to_string(),
         }
+    }
+    
+    /// Create a new Python client from configuration
+    pub fn from_config(config: AppConfig) -> Self {
+        Self::new(&config.python_service_url)
     }
     
     /// Get the base URL of the Python service
@@ -244,5 +233,19 @@ impl PythonClient {
             .map_err(|e| PythonClientError::ReqwestError(e))?;
         
         self.handle_response(response, &url).await
+    }
+}
+
+impl std::fmt::Display for PythonClientError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PythonClientError::RequestFailed(e) => write!(f, "Request failed: {}", e),
+            PythonClientError::InvalidResponse(e) => write!(f, "Invalid response: {}", e),
+            PythonClientError::AgentNotFound(e) => write!(f, "Agent not found: {}", e),
+            PythonClientError::Timeout(e) => write!(f, "Timeout: {}", e),
+            PythonClientError::IoError(e) => write!(f, "IO error: {}", e),
+            PythonClientError::ReqwestError(e) => write!(f, "Reqwest error: {}", e),
+            PythonClientError::SerdeError(e) => write!(f, "Serde JSON error: {}", e),
+        }
     }
 }
