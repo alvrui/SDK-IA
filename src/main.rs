@@ -16,6 +16,7 @@ use crate::app_data::AppData;
 use crate::services::persistence::PersistenceService;
 use crate::services::narrative::NarrativeService;
 use crate::services::validation::DomainValidationService;
+use crate::services::versioning::VersioningService;
 use crate::domain::hollywood_animal::CompatibilityMatrix;
 
 async fn health_check() -> impl Responder {
@@ -57,11 +58,15 @@ async fn main() -> io::Result<()> {
         compatibility_matrix.clone()
     ));
     
+    // Initialize versioning service
+    let versioning_service = Arc::new(VersioningService);
+    
     // Build application data
     let app_data = web::Data::new(AppData {
         persistence: persistence.clone(),
         narrative_service,
         validation_service,
+        versioning_service,
         compatibility_matrix,
     });
     
