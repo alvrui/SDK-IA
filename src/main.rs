@@ -17,6 +17,7 @@ use crate::services::persistence::PersistenceService;
 use crate::services::narrative::NarrativeService;
 use crate::services::validation::DomainValidationService;
 use crate::services::versioning::VersioningService;
+use crate::services::python_client::PythonClient;
 use crate::domain::hollywood_animal::CompatibilityMatrix;
 
 async fn health_check() -> impl Responder {
@@ -46,6 +47,9 @@ async fn main() -> io::Result<()> {
     // Initialize persistence service
     let persistence = Arc::new(PersistenceService::new("data/sdk-ia.db").expect("Failed to initialize database"));
     
+    // Initialize Python client for agent communication
+    let python_client = Arc::new(PythonClient::new("http://127.0.0.1:9000"));
+    
     // Initialize narrative service
     let narrative_service = Arc::new(NarrativeService::new(
         persistence.clone(),
@@ -68,6 +72,7 @@ async fn main() -> io::Result<()> {
         validation_service,
         versioning_service,
         compatibility_matrix,
+        python_client,
     });
     
     HttpServer::new(move || {
@@ -75,6 +80,7 @@ async fn main() -> io::Result<()> {
             .app_data(app_data.clone())
             .route("/api/v1/internal/health", web::get().to(health_check))
             .service(api::routes::configure())
+            .service(web::configure())
     })
     .bind("127.0.0.1:9090")?
     .run()
