@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 use std::str::FromStr;
 
 use crate::domain::{Project, Narrative, StoryElement, GameEvent, ProjectStatus, NarrativeStatus, StoryElementType, EventType};
+use crate::services::validation::{ValidationResult, ValidationError, ValidationSeverity};
 use crate::services::persistence::PersistenceService;
 use crate::services::narrative::NarrativeService;
 use crate::domain::hollywood_animal::CompatibilityMatrix;
@@ -1014,6 +1015,151 @@ pub async fn update_game_event(
     }
 }
 
+/// Validate a complete project
+pub async fn validate_project(
+    data: web::Data<Arc<AppData>>,
+    project_id: web::Path<String>,
+) -> impl Responder {
+    match Uuid::parse_str(&project_id.into_inner()) {
+        Ok(id) => {
+            match data.validation_service.validate_project(id) {
+                Ok(result) => {
+                    if result.valid {
+                        HttpResponse::Ok().json(serde_json::json!({
+                            "status": "success",
+                            "data": {
+                                "valid": result.valid,
+                                "errors": result.errors,
+                                "warnings": result.warnings
+                            }
+                        }))
+                    } else {
+                        HttpResponse::BadRequest().json(serde_json::json!({
+                            "status": "error",
+                            "data": {
+                                "valid": result.valid,
+                                "errors": result.errors,
+                                "warnings": result.warnings
+                            }
+                        }))
+                    }
+                }
+                Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+                    "status": "error",
+                    "error": e.to_string()
+                })),
+            }
+        }
+        Err(_) => HttpResponse::BadRequest().json(serde_json::json!({
+            "status": "error",
+            "error": "Invalid project ID format"
+        })),
+    }
+}
+
+/// Validate a story element
+pub async fn validate_story_element(
+    data: web::Data<Arc<AppData>>,
+    element_id: web::Path<String>,
+) -> impl Responder {
+    match Uuid::parse_str(&element_id.into_inner()) {
+        Ok(id) => {
+            match data.persistence.get_story_element(&id) {
+                Ok(Some(element)) => {
+                    let result = data.validation_service.validate_story_element(&element);
+                    if result.valid {
+                        HttpResponse::Ok().json(serde_json::json!({
+                            "status": "success",
+                            "data": {
+                                "valid": result.valid,
+                                "errors": result.errors,
+                                "warnings": result.warnings
+                            }
+                        }))
+                    } else {
+                        HttpResponse::BadRequest().json(serde_json::json!({
+                            "status": "error",
+                            "data": {
+                                "valid": result.valid,
+                                "errors": result.errors,
+                                "warnings": result.warnings
+                            }
+                        }))
+                    }
+                }
+                Ok(None) => HttpResponse::NotFound().json(serde_json::json!({
+                    "status": "error",
+                    "error": "Story element not found"
+                })),
+                Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+                    "status": "error",
+                    "error": e.to_string()
+                })),
+            }
+        }
+        Err(_) => HttpResponse::BadRequest().json(serde_json::json!({
+            "status": "error",
+            "error": "Invalid element ID format"
+        })),
+    }
+}
+
+/// Validate a game event
+pub async fn validate_game_event(
+    data: web::Data<Arc<AppData>>,
+    event_id: web::Path<String>,
+) -> impl Responder {
+    match Uuid::parse_str(&event_id.into_inner()) {
+        Ok(id) => {
+            match data.persistence.get_game_event(&id) {
+                Ok(Some(event)) => {
+                    let narrative_id = event.narrative_id;
+                    match data.persistence.list_story_elements_by_narrative(&narrative_id) {
+                        Ok(elements) => {
+                            let result = data.validation_service.validate_game_event(&event, &elements);
+                            if result.valid {
+                                HttpResponse::Ok().json(serde_json::json!({
+                                    "status": "success",
+                                    "data": {
+                                        "valid": result.valid,
+                                        "errors": result.errors,
+                                        "warnings": result.warnings
+                                    }
+                                }))
+                            } else {
+                                HttpResponse::BadRequest().json(serde_json::json!({
+                                    "status": "error",
+                                    "data": {
+                                        "valid": result.valid,
+                                        "errors": result.errors,
+                                        "warnings": result.warnings
+                                    }
+                                }))
+                            }
+                        }
+                        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+                            "status": "error",
+                            "error": e.to_string()
+                        })),
+                    }
+                }
+                Ok(None) => HttpResponse::NotFound().json(serde_json::json!({
+                    "status": "error",
+                    "error": "Game event not found"
+                })),
+                Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+                    "status": "error",
+                    "error": e.to_string()
+                })),
+            }
+        }
+        Err(_) => HttpResponse::BadRequest().json(serde_json::json!({
+            "status": "error",
+            "error": "Invalid event ID format"
+        })),
+    }
+}
+
 /// Delete a game event
 pub async fn delete_game_event(
     data: web::Data<Arc<AppData>>,
@@ -1048,22 +1194,24 @@ pub async fn validate_narrative(
 ) -> impl Responder {
     match Uuid::parse_str(&narrative_id.into_inner()) {
         Ok(id) => {
-            match data.narrative_service.validate_narrative_elements(id) {
-                Ok(errors) => {
-                    if errors.is_empty() {
+            match data.validation_service.validate_narrative(id) {
+                Ok(result) => {
+                    if result.valid {
                         HttpResponse::Ok().json(serde_json::json!({
                             "status": "success",
                             "data": {
-                                "valid": true,
-                                "errors": errors
+                                "valid": result.valid,
+                                "errors": result.errors,
+                                "warnings": result.warnings
                             }
                         }))
                     } else {
                         HttpResponse::BadRequest().json(serde_json::json!({
                             "status": "error",
                             "data": {
-                                "valid": false,
-                                "errors": errors
+                                "valid": result.valid,
+                                "errors": result.errors,
+                                "warnings": result.warnings
                             }
                         }))
                     }
@@ -1155,6 +1303,9 @@ pub fn configure_project_routes(cfg: &mut web::ServiceConfig) {
             .route("/narratives/{narrative_id}", web::put().to(update_narrative))
             .route("/narratives/{narrative_id}", web::delete().to(delete_narrative))
             .route("/narratives/{narrative_id}/validate", web::get().to(validate_narrative))
+            .route("/{project_id}/validate", web::get().to(validate_project))
+            .route("/elements/{element_id}/validate", web::get().to(validate_story_element))
+            .route("/events/{event_id}/validate", web::get().to(validate_game_event))
             // Story element routes
             .route("/narratives/{narrative_id}/elements", web::post().to(create_story_element))
             .route("/narratives/{narrative_id}/elements", web::get().to(list_story_elements))
