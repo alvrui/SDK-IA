@@ -363,7 +363,7 @@ impl DomainValidationService {
         let threshold = 0.6;
         
         if narrative.compatibility_score < threshold {
-            result.add_warning(ValidationResult::warning(
+            result.add_warning(ValidationError::warning(
                 "compatibility_score",
                 &format!("Narrative compatibility score ({:.2}) is below recommended threshold ({:.2})", 
                         narrative.compatibility_score, threshold)
