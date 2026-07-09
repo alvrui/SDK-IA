@@ -5,22 +5,17 @@ use actix_web::{web, App, HttpServer, Responder, HttpResponse};
 use std::io;
 use std::sync::Arc;
 
+mod app_data;
 mod config;
 mod domain;
 mod services;
 mod api;
 mod web;
 
+use crate::app_data::AppData;
 use crate::services::persistence::PersistenceService;
 use crate::services::narrative::NarrativeService;
 use crate::domain::hollywood_animal::CompatibilityMatrix;
-
-/// Application state containing all services
-pub struct AppData {
-    pub persistence: Arc<PersistenceService>,
-    pub narrative_service: Arc<NarrativeService>,
-    pub compatibility_matrix: Arc<CompatibilityMatrix>,
-}
 
 async fn health_check() -> impl Responder {
     HttpResponse::Ok().json(serde_json::json!({
