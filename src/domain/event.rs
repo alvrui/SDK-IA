@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
+use std::str::FromStr;
 
 /// Type of game event
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -20,6 +21,24 @@ pub enum EventType {
 impl Default for EventType {
     fn default() -> Self {
         EventType::Scene
+    }
+}
+
+impl FromStr for EventType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "scene" => Ok(EventType::Scene),
+            "dialogue" => Ok(EventType::Dialogue),
+            "action" => Ok(EventType::Action),
+            "decision" => Ok(EventType::Decision),
+            "transition" => Ok(EventType::Transition),
+            "combat" => Ok(EventType::Combat),
+            "puzzle" => Ok(EventType::Puzzle),
+            "exploration" => Ok(EventType::Exploration),
+            _ => Err(format!("Unknown event type: {}", s)),
+        }
     }
 }
 
