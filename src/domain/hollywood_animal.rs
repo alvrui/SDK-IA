@@ -82,62 +82,67 @@ pub struct HollywoodElement {
 
 impl HollywoodElement {
     pub fn from_csv_row(row: &csv::StringRecord) -> Result<Self, String> {
-        let category = row.get("category")
-            .ok_or("Missing category")?
-            .parse::<ElementCategory>()
-            .map_err(|e| format!("Invalid category: {}", e))?;
+        // CSV column indices based on expected order:
+        // 0: id, 1: category, 2: subtype, 3: narrative_scale,
+        // 4: tone_serious, 5: tone_comic, 6: tone_grim, 7: tone_adventurous, 8: tone_melodramatic, 9: tone_pulpy
+        // 10: moral_idealist, 11: moral_cynical, 12: moral_corrupt, 13: moral_redemptive, 14: moral_lawful, 15: moral_chaotic
+        // 16: realism_grounded, 17: realism_heightened, 18: realism_fantastical, 19: realism_supernatural, 20: realism_sci_fi
+        // 21: agency_type, 22: core_drives, 23: content_flags, 24: genre_affinity, 25: setting_affinity
         
-        let parse_float = |field: &str| -> f32 {
-            row.get(field)
+        let parse_float = |index: usize| -> f32 {
+            row.get(index)
                 .and_then(|s| s.parse::<f32>().ok())
                 .unwrap_or(0.0)
         };
         
-        let parse_list = |field: &str| -> Vec<String> {
-            row.get(field)
+        let parse_list = |index: usize| -> Vec<String> {
+            row.get(index)
                 .map(|s| s.split(';').map(|s| s.to_string()).collect())
                 .unwrap_or_default()
         };
         
-        let parse_flags = |field: &str| -> Vec<String> {
-            row.get(field)
+        let parse_flags = |index: usize| -> Vec<String> {
+            row.get(index)
                 .map(|s| s.split(';').filter(|s| !s.is_empty()).map(|s| s.to_string()).collect())
                 .unwrap_or_default()
         };
         
         Ok(Self {
-            id: row.get("id").ok_or("Missing id")?.to_string(),
-            category,
-            subtype: row.get("subtype").ok_or("Missing subtype")?.to_string(),
-            narrative_scale: row.get("narrative_scale").ok_or("Missing narrative_scale")?.to_string(),
+            id: row.get(0).ok_or("Missing id")?.to_string(),
+            category: row.get(1)
+                .ok_or("Missing category")?
+                .parse::<ElementCategory>()
+                .map_err(|e| format!("Invalid category: {}", e))?,
+            subtype: row.get(2).ok_or("Missing subtype")?.to_string(),
+            narrative_scale: row.get(3).ok_or("Missing narrative_scale")?.to_string(),
             tone_profile: ToneProfile {
-                serious: parse_float("tone_serious"),
-                comic: parse_float("tone_comic"),
-                grim: parse_float("tone_grim"),
-                adventurous: parse_float("tone_adventurous"),
-                melodramatic: parse_float("tone_melodramatic"),
-                pulpy: parse_float("tone_pulpy"),
+                serious: parse_float(4),
+                comic: parse_float(5),
+                grim: parse_float(6),
+                adventurous: parse_float(7),
+                melodramatic: parse_float(8),
+                pulpy: parse_float(9),
             },
             moral_profile: MoralProfile {
-                idealist: parse_float("moral_idealist"),
-                cynical: parse_float("moral_cynical"),
-                corrupt: parse_float("moral_corrupt"),
-                redemptive: parse_float("moral_redemptive"),
-                lawful: parse_float("moral_lawful"),
-                chaotic: parse_float("moral_chaotic"),
+                idealist: parse_float(10),
+                cynical: parse_float(11),
+                corrupt: parse_float(12),
+                redemptive: parse_float(13),
+                lawful: parse_float(14),
+                chaotic: parse_float(15),
             },
             realism_profile: RealismProfile {
-                grounded: parse_float("realism_grounded"),
-                heightened: parse_float("realism_heightened"),
-                fantastical: parse_float("realism_fantastical"),
-                supernatural: parse_float("realism_supernatural"),
-                sci_fi: parse_float("realism_sci_fi"),
+                grounded: parse_float(16),
+                heightened: parse_float(17),
+                fantastical: parse_float(18),
+                supernatural: parse_float(19),
+                sci_fi: parse_float(20),
             },
-            agency_type: row.get("agency_type").ok_or("Missing agency_type")?.to_string(),
-            core_drives: parse_list("core_drives"),
-            content_flags: parse_flags("content_flags"),
-            genre_affinity: parse_list("genre_affinity"),
-            setting_affinity: parse_list("setting_affinity"),
+            agency_type: row.get(21).ok_or("Missing agency_type")?.to_string(),
+            core_drives: parse_list(22),
+            content_flags: parse_flags(23),
+            genre_affinity: parse_list(24),
+            setting_affinity: parse_list(25),
         })
     }
 }
@@ -229,11 +234,11 @@ impl CompatibilityMatrix {
         
         for result in rdr.records() {
             let row = result.map_err(|e| format!("CSV error: {}", e))?;
-            let pair_type = row.get("pair_type")
+            let pair_type = row.get(0)
                 .ok_or("Missing pair_type")?.to_string();
-            let axis = row.get("axis")
+            let axis = row.get(1)
                 .ok_or("Missing axis")?.to_string();
-            let weight: f32 = row.get("weight")
+            let weight: f32 = row.get(2)
                 .ok_or("Missing weight")?.parse()
                 .map_err(|e| format!("Invalid weight: {}", e))?;
             
