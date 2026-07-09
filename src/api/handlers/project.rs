@@ -7,6 +7,9 @@ use std::str::FromStr;
 
 use crate::domain::{Project, Narrative, StoryElement, GameEvent, ProjectStatus, NarrativeStatus, StoryElementType, EventType};
 use crate::services::persistence::PersistenceService;
+use crate::services::narrative::NarrativeService;
+use crate::domain::hollywood_animal::CompatibilityMatrix;
+use crate::main::AppData;
 
 // ==================== REQUEST/RESPONSE TYPES ====================
 
@@ -120,7 +123,7 @@ pub struct CreateGameEventRequest {
 
 /// Create a new project
 pub async fn create_project(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     payload: web::Json<CreateProjectRequest>,
 ) -> impl Responder {
     let mut project = Project::new(
@@ -131,7 +134,7 @@ pub async fn create_project(
     project.tags = payload.tags.clone();
     project.metadata = payload.metadata.clone();
 
-    match db.create_project(&project) {
+    match data.persistence.create_project(&project) {
         Ok(id) => HttpResponse::Created().json(serde_json::json!({
             "status": "success",
             "data": {
@@ -150,12 +153,12 @@ pub async fn create_project(
 
 /// Get a project by ID
 pub async fn get_project(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     project_id: web::Path<String>,
 ) -> impl Responder {
     match Uuid::parse_str(&project_id.into_inner()) {
         Ok(id) => {
-            match db.get_project(&id) {
+            match data.persistence.get_project(&id) {
                 Ok(Some(project)) => HttpResponse::Ok().json(serde_json::json!({
                     "status": "success",
                     "data": project
@@ -179,14 +182,14 @@ pub async fn get_project(
 
 /// List all projects with pagination
 pub async fn list_projects(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     query: web::Query<SearchProjectsQuery>,
 ) -> impl Responder {
     let tags: Option<Vec<String>> = query.tags.as_ref().map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
     
     let status: Option<ProjectStatus> = query.status.as_ref().and_then(|s| ProjectStatus::from_str(s).ok());
 
-    match db.search_projects(
+    match data.persistence.search_projects(
         query.name.as_deref(),
         query.author.as_deref(),
         status.as_ref(),
@@ -195,7 +198,7 @@ pub async fn list_projects(
         query.page_size,
     ) {
         Ok(projects) => {
-            let total = db.count_projects_search(
+            let total = data.persistence.count_projects_search(
                 query.name.as_deref(),
                 query.author.as_deref(),
                 status.as_ref(),
@@ -222,13 +225,13 @@ pub async fn list_projects(
 
 /// Update a project
 pub async fn update_project(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     project_id: web::Path<String>,
     payload: web::Json<UpdateProjectRequest>,
 ) -> impl Responder {
     match Uuid::parse_str(&project_id.into_inner()) {
         Ok(id) => {
-            match db.get_project(&id) {
+            match data.persistence.get_project(&id) {
                 Ok(Some(mut project)) => {
                     if let Some(name) = &payload.name {
                         project.name = name.clone();
@@ -253,7 +256,7 @@ pub async fn update_project(
                     project.updated_at = Utc::now();
                     project.update_version("patch");
 
-                    match db.update_project(&project) {
+                    match data.persistence.update_project(&project) {
                         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
                             "status": "success",
                             "data": project,
@@ -284,12 +287,12 @@ pub async fn update_project(
 
 /// Delete a project
 pub async fn delete_project(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     project_id: web::Path<String>,
 ) -> impl Responder {
     match Uuid::parse_str(&project_id.into_inner()) {
         Ok(id) => {
-            match db.delete_project(&id) {
+            match data.persistence.delete_project(&id) {
                 Ok(_) => HttpResponse::Ok().json(serde_json::json!({
                     "status": "success",
                     "message": "Project and all related data deleted successfully"
@@ -309,33 +312,57 @@ pub async fn delete_project(
 
 // ==================== NARRATIVE ENDPOINTS ====================
 
-/// Create a new narrative
+/// Create a new narrative with automatic compatibility calculation
 pub async fn create_narrative(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     project_id: web::Path<String>,
     payload: web::Json<CreateNarrativeRequest>,
 ) -> impl Responder {
     match Uuid::parse_str(&project_id.into_inner()) {
         Ok(project_id_uuid) => {
-            let mut narrative = Narrative::new(
+            // Validate theme IDs exist in Hollywood Animal catalog
+            for theme_id in &payload.theme_ids {
+                if !data.compatibility_matrix.elements.contains_key(theme_id) {
+                    return HttpResponse::BadRequest().json(serde_json::json!({
+                        "status": "error",
+                        "error": format!("Theme '{}' not found in Hollywood Animal catalog", theme_id)
+                    }));
+                }
+            }
+
+            match data.narrative_service.create_narrative_with_compatibility(
                 project_id_uuid,
                 payload.title.clone(),
                 payload.synopsis.clone(),
-            );
-            narrative.theme_ids = payload.theme_ids.clone();
-            narrative.metadata = payload.metadata.clone();
-
-            match db.create_narrative(&narrative) {
-                Ok(id) => HttpResponse::Created().json(serde_json::json!({
-                    "status": "success",
-                    "data": {
-                        "id": id.to_string(),
-                        "project_id": narrative.project_id.to_string(),
-                        "title": narrative.title,
-                        "version": narrative.version,
-                        "created_at": narrative.created_at.to_rfc3339()
+                payload.theme_ids.clone(),
+                payload.metadata.clone(),
+            ) {
+                Ok(id) => {
+                    // Get the created narrative to return full data
+                    if let Ok(Some(narrative)) = data.persistence.get_narrative(&id) {
+                        HttpResponse::Created().json(serde_json::json!({
+                            "status": "success",
+                            "data": {
+                                "id": id.to_string(),
+                                "project_id": narrative.project_id.to_string(),
+                                "title": narrative.title,
+                                "compatibility_score": narrative.compatibility_score,
+                                "version": narrative.version,
+                                "created_at": narrative.created_at.to_rfc3339()
+                            }
+                        }))
+                    } else {
+                        HttpResponse::Created().json(serde_json::json!({
+                            "status": "success",
+                            "data": {
+                                "id": id.to_string(),
+                                "project_id": project_id_uuid.to_string(),
+                                "title": payload.title,
+                                "version": "1.0.0"
+                            }
+                        }))
                     }
-                })),
+                }
                 Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
                     "status": "error",
                     "error": e.to_string()
@@ -351,16 +378,28 @@ pub async fn create_narrative(
 
 /// Get a narrative by ID
 pub async fn get_narrative(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     narrative_id: web::Path<String>,
 ) -> impl Responder {
     match Uuid::parse_str(&narrative_id.into_inner()) {
         Ok(id) => {
-            match db.get_narrative(&id) {
-                Ok(Some(narrative)) => HttpResponse::Ok().json(serde_json::json!({
-                    "status": "success",
-                    "data": narrative
-                })),
+            match data.persistence.get_narrative(&id) {
+                Ok(Some(narrative)) => {
+                    // Also get story elements for this narrative
+                    match data.persistence.list_story_elements_by_narrative(&id) {
+                        Ok(elements) => HttpResponse::Ok().json(serde_json::json!({
+                            "status": "success",
+                            "data": {
+                                "narrative": narrative,
+                                "story_elements": elements
+                            }
+                        })),
+                        Err(_) => HttpResponse::Ok().json(serde_json::json!({
+                            "status": "success",
+                            "data": narrative
+                        })),
+                    }
+                }
                 Ok(None) => HttpResponse::NotFound().json(serde_json::json!({
                     "status": "error",
                     "error": "Narrative not found"
@@ -380,12 +419,12 @@ pub async fn get_narrative(
 
 /// List narratives by project ID
 pub async fn list_narratives(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     project_id: web::Path<String>,
 ) -> impl Responder {
     match Uuid::parse_str(&project_id.into_inner()) {
         Ok(id) => {
-            match db.list_narratives_by_project(&id) {
+            match data.persistence.list_narratives_by_project(&id) {
                 Ok(narratives) => HttpResponse::Ok().json(serde_json::json!({
                     "status": "success",
                     "data": narratives,
@@ -409,13 +448,25 @@ pub async fn list_narratives(
 
 /// Update a narrative
 pub async fn update_narrative(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     narrative_id: web::Path<String>,
     payload: web::Json<UpdateNarrativeRequest>,
 ) -> impl Responder {
     match Uuid::parse_str(&narrative_id.into_inner()) {
         Ok(id) => {
-            match db.get_narrative(&id) {
+            // Validate theme IDs if provided
+            if let Some(ref theme_ids) = payload.theme_ids {
+                for theme_id in theme_ids {
+                    if !data.compatibility_matrix.elements.contains_key(theme_id) {
+                        return HttpResponse::BadRequest().json(serde_json::json!({
+                            "status": "error",
+                            "error": format!("Theme '{}' not found in Hollywood Animal catalog", theme_id)
+                        }));
+                    }
+                }
+            }
+
+            match data.persistence.get_narrative(&id) {
                 Ok(Some(mut narrative)) => {
                     if let Some(title) = &payload.title {
                         narrative.title = title.clone();
@@ -437,7 +488,12 @@ pub async fn update_narrative(
                     narrative.updated_at = Utc::now();
                     narrative.update_version("patch");
 
-                    match db.update_narrative(&narrative) {
+                    // Recalculate compatibility score
+                    if let Err(e) = data.narrative_service.recalculate_narrative_compatibility(id) {
+                        eprintln!("Failed to recalculate compatibility: {}", e);
+                    }
+
+                    match data.persistence.update_narrative(&narrative) {
                         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
                             "status": "success",
                             "data": narrative,
@@ -468,12 +524,12 @@ pub async fn update_narrative(
 
 /// Delete a narrative
 pub async fn delete_narrative(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     narrative_id: web::Path<String>,
 ) -> impl Responder {
     match Uuid::parse_str(&narrative_id.into_inner()) {
         Ok(id) => {
-            match db.delete_narrative(&id) {
+            match data.persistence.delete_narrative(&id) {
                 Ok(_) => HttpResponse::Ok().json(serde_json::json!({
                     "status": "success",
                     "message": "Narrative and all related data deleted successfully"
@@ -493,21 +549,30 @@ pub async fn delete_narrative(
 
 // ==================== STORY ELEMENT ENDPOINTS ====================
 
-/// Create a new story element
+/// Create a new story element with validation
 pub async fn create_story_element(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     narrative_id: web::Path<String>,
     payload: web::Json<CreateStoryElementRequest>,
 ) -> impl Responder {
     match Uuid::parse_str(&narrative_id.into_inner()) {
         Ok(narrative_id_uuid) => {
+            // Validate Hollywood element ID
+            if !data.compatibility_matrix.elements.contains_key(&payload.hollywood_element_id) {
+                return HttpResponse::BadRequest().json(serde_json::json!({
+                    "status": "error",
+                    "error": format!("Hollywood element '{}' not found in catalog", payload.hollywood_element_id)
+                }));
+            }
+
+            // Validate element type
             let element_type = match StoryElementType::from_str(&payload.element_type) {
                 Ok(et) => et,
                 Err(_) => {
                     return HttpResponse::BadRequest().json(serde_json::json!({
                         "status": "error",
                         "error": format!("Invalid element type: {}", payload.element_type)
-                    }))
+                    }));
                 }
             };
 
@@ -519,17 +584,31 @@ pub async fn create_story_element(
                 payload.description.clone(),
             );
 
-            match db.create_story_element(&element) {
-                Ok(id) => HttpResponse::Created().json(serde_json::json!({
-                    "status": "success",
-                    "data": {
-                        "id": id.to_string(),
-                        "narrative_id": element.narrative_id.to_string(),
-                        "element_type": format!("{:?}", element.element_type),
-                        "name": element.name,
-                        "created_at": element.created_at.to_rfc3339()
+            match data.narrative_service.add_story_element_and_recalculate(narrative_id_uuid, &element) {
+                Ok(_) => {
+                    // Get the created element to return ID
+                    if let Ok(Some(created_element)) = data.persistence.get_story_element(&element.id) {
+                        HttpResponse::Created().json(serde_json::json!({
+                            "status": "success",
+                            "data": {
+                                "id": created_element.id.to_string(),
+                                "narrative_id": created_element.narrative_id.to_string(),
+                                "element_type": format!("{:?}", created_element.element_type),
+                                "hollywood_element_id": created_element.hollywood_element_id,
+                                "name": created_element.name,
+                                "created_at": created_element.created_at.to_rfc3339()
+                            },
+                            "message": "Story element created and narrative compatibility recalculated"
+                        }))
+                    } else {
+                        HttpResponse::Created().json(serde_json::json!({
+                            "status": "success",
+                            "data": {
+                                "id": element.id.to_string()
+                            }
+                        }))
                     }
-                })),
+                }
                 Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
                     "status": "error",
                     "error": e.to_string()
@@ -545,12 +624,12 @@ pub async fn create_story_element(
 
 /// Get a story element by ID
 pub async fn get_story_element(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     element_id: web::Path<String>,
 ) -> impl Responder {
     match Uuid::parse_str(&element_id.into_inner()) {
         Ok(id) => {
-            match db.get_story_element(&id) {
+            match data.persistence.get_story_element(&id) {
                 Ok(Some(element)) => HttpResponse::Ok().json(serde_json::json!({
                     "status": "success",
                     "data": element
@@ -574,12 +653,12 @@ pub async fn get_story_element(
 
 /// List story elements by narrative ID
 pub async fn list_story_elements(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     narrative_id: web::Path<String>,
 ) -> impl Responder {
     match Uuid::parse_str(&narrative_id.into_inner()) {
         Ok(id) => {
-            match db.list_story_elements_by_narrative(&id) {
+            match data.persistence.list_story_elements_by_narrative(&id) {
                 Ok(elements) => HttpResponse::Ok().json(serde_json::json!({
                     "status": "success",
                     "data": elements,
@@ -603,14 +682,14 @@ pub async fn list_story_elements(
 
 /// List story elements by narrative ID and type
 pub async fn list_story_elements_by_type(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     params: web::Path<(String, String)>,
 ) -> impl Responder {
     let (narrative_id, element_type) = params.into_inner();
     
     match (Uuid::parse_str(&narrative_id), StoryElementType::from_str(&element_type)) {
         (Ok(narrative_id_uuid), Ok(element_type_enum)) => {
-            match db.list_story_elements_by_type(&narrative_id_uuid, element_type_enum) {
+            match data.persistence.list_story_elements_by_type(&narrative_id_uuid, element_type_enum) {
                 Ok(elements) => HttpResponse::Ok().json(serde_json::json!({
                     "status": "success",
                     "data": elements,
@@ -635,13 +714,21 @@ pub async fn list_story_elements_by_type(
 
 /// Update a story element
 pub async fn update_story_element(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     element_id: web::Path<String>,
     payload: web::Json<CreateStoryElementRequest>,
 ) -> impl Responder {
     match Uuid::parse_str(&element_id.into_inner()) {
         Ok(id) => {
-            match db.get_story_element(&id) {
+            // Validate Hollywood element ID
+            if !data.compatibility_matrix.elements.contains_key(&payload.hollywood_element_id) {
+                return HttpResponse::BadRequest().json(serde_json::json!({
+                    "status": "error",
+                    "error": format!("Hollywood element '{}' not found in catalog", payload.hollywood_element_id)
+                }));
+            }
+
+            match data.persistence.get_story_element(&id) {
                 Ok(Some(mut element)) => {
                     if let Ok(et) = StoryElementType::from_str(&payload.element_type) {
                         element.element_type = et;
@@ -651,12 +738,19 @@ pub async fn update_story_element(
                     element.description = payload.description.clone();
                     element.attributes = payload.attributes.clone();
 
-                    match db.update_story_element(&element) {
-                        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
-                            "status": "success",
-                            "data": element,
-                            "message": "Story element updated successfully"
-                        })),
+                    match data.persistence.update_story_element(&element) {
+                        Ok(_) => {
+                            // Recalculate narrative compatibility
+                            if let Err(e) = data.narrative_service.recalculate_narrative_compatibility(element.narrative_id) {
+                                eprintln!("Failed to recalculate compatibility: {}", e);
+                            }
+                            
+                            HttpResponse::Ok().json(serde_json::json!({
+                                "status": "success",
+                                "data": element,
+                                "message": "Story element updated and narrative compatibility recalculated"
+                            }))
+                        }
                         Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
                             "status": "error",
                             "error": e.to_string()
@@ -682,16 +776,31 @@ pub async fn update_story_element(
 
 /// Delete a story element
 pub async fn delete_story_element(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     element_id: web::Path<String>,
 ) -> impl Responder {
     match Uuid::parse_str(&element_id.into_inner()) {
         Ok(id) => {
-            match db.delete_story_element(&id) {
-                Ok(_) => HttpResponse::Ok().json(serde_json::json!({
-                    "status": "success",
-                    "message": "Story element deleted successfully"
-                })),
+            // Get the element first to get its narrative_id
+            let narrative_id = match data.persistence.get_story_element(&id) {
+                Ok(Some(element)) => Some(element.narrative_id),
+                _ => None,
+            };
+
+            match data.persistence.delete_story_element(&id) {
+                Ok(_) => {
+                    // Recalculate narrative compatibility if we have the narrative_id
+                    if let Some(narrative_id) = narrative_id {
+                        if let Err(e) = data.narrative_service.recalculate_narrative_compatibility(narrative_id) {
+                            eprintln!("Failed to recalculate compatibility: {}", e);
+                        }
+                    }
+                    
+                    HttpResponse::Ok().json(serde_json::json!({
+                        "status": "success",
+                        "message": "Story element deleted and narrative compatibility recalculated"
+                    }))
+                }
                 Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
                     "status": "error",
                     "error": e.to_string()
@@ -709,19 +818,29 @@ pub async fn delete_story_element(
 
 /// Create a new game event
 pub async fn create_game_event(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     narrative_id: web::Path<String>,
     payload: web::Json<CreateGameEventRequest>,
 ) -> impl Responder {
     match Uuid::parse_str(&narrative_id.into_inner()) {
         Ok(narrative_id_uuid) => {
+            // Validate Hollywood event ID if provided
+            if let Some(ref event_id) = payload.hollywood_event_id {
+                if !data.compatibility_matrix.elements.contains_key(event_id) {
+                    return HttpResponse::BadRequest().json(serde_json::json!({
+                        "status": "error",
+                        "error": format!("Hollywood event '{}' not found in catalog", event_id)
+                    }));
+                }
+            }
+
             let event_type = match EventType::from_str(&payload.event_type) {
                 Ok(et) => et,
                 Err(_) => {
                     return HttpResponse::BadRequest().json(serde_json::json!({
                         "status": "error",
                         "error": format!("Invalid event type: {}", payload.event_type)
-                    }))
+                    }));
                 }
             };
 
@@ -743,7 +862,7 @@ pub async fn create_game_event(
             event.order_index = payload.order_index.unwrap_or(0);
             event.attributes = payload.attributes.clone();
 
-            match db.create_game_event(&event) {
+            match data.persistence.create_game_event(&event) {
                 Ok(id) => HttpResponse::Created().json(serde_json::json!({
                     "status": "success",
                     "data": {
@@ -770,12 +889,12 @@ pub async fn create_game_event(
 
 /// Get a game event by ID
 pub async fn get_game_event(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     event_id: web::Path<String>,
 ) -> impl Responder {
     match Uuid::parse_str(&event_id.into_inner()) {
         Ok(id) => {
-            match db.get_game_event(&id) {
+            match data.persistence.get_game_event(&id) {
                 Ok(Some(event)) => HttpResponse::Ok().json(serde_json::json!({
                     "status": "success",
                     "data": event
@@ -799,12 +918,12 @@ pub async fn get_game_event(
 
 /// List game events by narrative ID
 pub async fn list_game_events(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     narrative_id: web::Path<String>,
 ) -> impl Responder {
     match Uuid::parse_str(&narrative_id.into_inner()) {
         Ok(id) => {
-            match db.list_game_events_by_narrative(&id) {
+            match data.persistence.list_game_events_by_narrative(&id) {
                 Ok(events) => HttpResponse::Ok().json(serde_json::json!({
                     "status": "success",
                     "data": events,
@@ -828,13 +947,23 @@ pub async fn list_game_events(
 
 /// Update a game event
 pub async fn update_game_event(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     event_id: web::Path<String>,
     payload: web::Json<CreateGameEventRequest>,
 ) -> impl Responder {
     match Uuid::parse_str(&event_id.into_inner()) {
         Ok(id) => {
-            match db.get_game_event(&id) {
+            // Validate Hollywood event ID if provided
+            if let Some(ref event_id) = payload.hollywood_event_id {
+                if !data.compatibility_matrix.elements.contains_key(event_id) {
+                    return HttpResponse::BadRequest().json(serde_json::json!({
+                        "status": "error",
+                        "error": format!("Hollywood event '{}' not found in catalog", event_id)
+                    }));
+                }
+            }
+
+            match data.persistence.get_game_event(&id) {
                 Ok(Some(mut event)) => {
                     if let Ok(et) = EventType::from_str(&payload.event_type) {
                         event.event_type = et;
@@ -856,7 +985,7 @@ pub async fn update_game_event(
                     event.attributes = payload.attributes.clone();
                     event.updated_at = Utc::now();
 
-                    match db.update_game_event(&event) {
+                    match data.persistence.update_game_event(&event) {
                         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
                             "status": "success",
                             "data": event,
@@ -887,12 +1016,12 @@ pub async fn update_game_event(
 
 /// Delete a game event
 pub async fn delete_game_event(
-    db: web::Data<Arc<PersistenceService>>,
+    data: web::Data<Arc<AppData>>,
     event_id: web::Path<String>,
 ) -> impl Responder {
     match Uuid::parse_str(&event_id.into_inner()) {
         Ok(id) => {
-            match db.delete_game_event(&id) {
+            match data.persistence.delete_game_event(&id) {
                 Ok(_) => HttpResponse::Ok().json(serde_json::json!({
                     "status": "success",
                     "message": "Game event deleted successfully"
@@ -906,6 +1035,103 @@ pub async fn delete_game_event(
         Err(_) => HttpResponse::BadRequest().json(serde_json::json!({
             "status": "error",
             "error": "Invalid event ID format"
+        })),
+    }
+}
+
+// ==================== VALIDATION ENDPOINTS ====================
+
+/// Validate all elements in a narrative
+pub async fn validate_narrative(
+    data: web::Data<Arc<AppData>>,
+    narrative_id: web::Path<String>,
+) -> impl Responder {
+    match Uuid::parse_str(&narrative_id.into_inner()) {
+        Ok(id) => {
+            match data.narrative_service.validate_narrative_elements(id) {
+                Ok(errors) => {
+                    if errors.is_empty() {
+                        HttpResponse::Ok().json(serde_json::json!({
+                            "status": "success",
+                            "data": {
+                                "valid": true,
+                                "errors": errors
+                            }
+                        }))
+                    } else {
+                        HttpResponse::BadRequest().json(serde_json::json!({
+                            "status": "error",
+                            "data": {
+                                "valid": false,
+                                "errors": errors
+                            }
+                        }))
+                    }
+                }
+                Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
+                    "status": "error",
+                    "error": e.to_string()
+                })),
+            }
+        }
+        Err(_) => HttpResponse::BadRequest().json(serde_json::json!({
+            "status": "error",
+            "error": "Invalid narrative ID format"
+        })),
+    }
+}
+
+/// Validate a Hollywood element ID
+pub async fn validate_hollywood_element(
+    data: web::Data<Arc<AppData>>,
+    element_id: web::Path<String>,
+) -> impl Responder {
+    let element_id = element_id.into_inner();
+    let valid = data.compatibility_matrix.elements.contains_key(&element_id);
+    
+    if valid {
+        if let Some(element) = data.compatibility_matrix.elements.get(&element_id) {
+            HttpResponse::Ok().json(serde_json::json!({
+                "status": "success",
+                "data": {
+                    "valid": true,
+                    "element": element
+                }
+            }))
+        } else {
+            HttpResponse::Ok().json(serde_json::json!({
+                "status": "success",
+                "data": {
+                    "valid": true
+                }
+            }))
+        }
+    } else {
+        HttpResponse::NotFound().json(serde_json::json!({
+            "status": "error",
+            "data": {
+                "valid": false,
+                "error": format!("Element '{}' not found in Hollywood Animal catalog", element_id)
+            }
+        }))
+    }
+}
+
+/// Get compatibility between two Hollywood elements
+pub async fn get_element_compatibility(
+    data: web::Data<Arc<AppData>>,
+    query: web::Query<(String, String)>,
+) -> impl Responder {
+    let (element_a, element_b) = query.into_inner();
+    
+    match data.compatibility_matrix.calculate_compatibility(&element_a, &element_b, None) {
+        Ok(result) => HttpResponse::Ok().json(serde_json::json!({
+            "status": "success",
+            "data": result
+        })),
+        Err(e) => HttpResponse::BadRequest().json(serde_json::json!({
+            "status": "error",
+            "error": e
         })),
     }
 }
@@ -928,6 +1154,7 @@ pub fn configure_project_routes(cfg: &mut web::ServiceConfig) {
             .route("/narratives/{narrative_id}", web::get().to(get_narrative))
             .route("/narratives/{narrative_id}", web::put().to(update_narrative))
             .route("/narratives/{narrative_id}", web::delete().to(delete_narrative))
+            .route("/narratives/{narrative_id}/validate", web::get().to(validate_narrative))
             // Story element routes
             .route("/narratives/{narrative_id}/elements", web::post().to(create_story_element))
             .route("/narratives/{narrative_id}/elements", web::get().to(list_story_elements))
@@ -941,5 +1168,8 @@ pub fn configure_project_routes(cfg: &mut web::ServiceConfig) {
             .route("/events/{event_id}", web::get().to(get_game_event))
             .route("/events/{event_id}", web::put().to(update_game_event))
             .route("/events/{event_id}", web::delete().to(delete_game_event))
+            // Validation routes
+            .route("/hollywood/elements/{element_id}/validate", web::get().to(validate_hollywood_element))
+            .route("/hollywood/compatibility", web::get().to(get_element_compatibility))
     );
 }
