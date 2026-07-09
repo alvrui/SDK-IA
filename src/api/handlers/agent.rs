@@ -2,9 +2,8 @@
 // Provides REST endpoints for managing Mistral AI agents
 // Acts as a proxy to the Python Secretario service
 
-use actix_web::{web, HttpResponse, Responder, Error as ActixError};
+use actix_web::{web, HttpResponse, Responder};
 use serde_json::json;
-use std::sync::Arc;
 
 use crate::domain::{Agent, AgentCreate, AgentUpdate, AgentMessage, AgentMessageCreate, AgentConversation, AgentListResponse, AgentServiceStatus};
 use crate::services::python_client::PythonClient;
@@ -40,7 +39,7 @@ async fn list_agents(data: web::Data<AppData>) -> impl Responder {
             };
             
             HttpResponse::Ok().json(AgentListResponse {
-                agents,
+                agents: agents.clone(),
                 total: agents.len(),
             })
         }
@@ -75,7 +74,8 @@ async fn get_agent(
     data: web::Data<AppData>,
     agent_id: web::Path<String>,
 ) -> impl Responder {
-    match data.python_client.get_agent(&agent_id).await {
+    let agent_id_str = agent_id.into_inner();
+    match data.python_client.get_agent(&agent_id_str).await {
         Ok(agent_json) => {
             let agent: Agent = serde_json::from_value(agent_json).unwrap();
             HttpResponse::Ok().json(agent)
@@ -93,9 +93,10 @@ async fn update_agent(
     agent_id: web::Path<String>,
     agent_data: web::Json<AgentUpdate>,
 ) -> impl Responder {
+    let agent_id_str = agent_id.into_inner();
     let agent_json = serde_json::to_value(&agent_data.into_inner()).unwrap();
     
-    match data.python_client.update_agent(&agent_id, agent_json).await {
+    match data.python_client.update_agent(&agent_id_str, agent_json).await {
         Ok(agent_json) => {
             let agent: Agent = serde_json::from_value(agent_json).unwrap();
             HttpResponse::Ok().json(agent)
@@ -112,7 +113,8 @@ async fn delete_agent(
     data: web::Data<AppData>,
     agent_id: web::Path<String>,
 ) -> impl Responder {
-    match data.python_client.delete_agent(&agent_id).await {
+    let agent_id_str = agent_id.into_inner();
+    match data.python_client.delete_agent(&agent_id_str).await {
         Ok(_) => HttpResponse::NoContent().finish(),
         Err(e) => HttpResponse::NotFound().json(json!({
             "error": e.to_string(),
@@ -131,8 +133,9 @@ async fn send_agent_message(
     agent_id: web::Path<String>,
     message_data: web::Json<AgentMessageCreate>,
 ) -> impl Responder {
+    let agent_id_str = agent_id.into_inner();
     match data.python_client.send_message_with_conversation(
-        &agent_id,
+        &agent_id_str,
         message_data.conversation_id.as_deref(),
         &message_data.content,
     ).await {
@@ -153,8 +156,8 @@ async fn send_agent_message(
 
 /// List conversations for an agent
 async fn list_agent_conversations(
-    data: web::Data<AppData>,
-    agent_id: web::Path<String>,
+    _data: web::Data<AppData>,
+    _agent_id: web::Path<String>,
 ) -> impl Responder {
     // For now, return conversations from storage
     // This would need to be implemented in PythonClient
