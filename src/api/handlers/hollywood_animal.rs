@@ -1,6 +1,7 @@
 use actix_web::{web, HttpResponse, Responder};
 use serde_json::json;
 use std::str::FromStr as _;
+use std::collections::HashMap;
 
 use crate::domain::hollywood_animal::{CompatibilityMatrix, HollywoodElement, CompatibilityResult, CompatibilityCategory};
 use crate::app_data::AppData;
@@ -50,13 +51,13 @@ async fn calculate_compatibility(
         .ok_or_else(|| HttpResponse::BadRequest().json(json!({
             "error": "Missing element_a_id"
         })));
-    
+
     let element_b_id = payload.get("element_b_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| HttpResponse::BadRequest().json(json!({
             "error": "Missing element_b_id"
         })));
-    
+
     match (element_a_id, element_b_id) {
         (Ok(a_id), Ok(b_id)) => {
             if let Ok(result) = data.compatibility_matrix.calculate_compatibility(a_id, b_id, None) {
@@ -74,7 +75,7 @@ async fn calculate_compatibility(
 /// List all element categories
 async fn list_element_categories() -> impl Responder {
     use crate::domain::hollywood_animal::ElementCategory;
-    
+
     let categories = vec![
         ElementCategory::Protagonist,
         ElementCategory::Antagonist,
@@ -83,7 +84,7 @@ async fn list_element_categories() -> impl Responder {
         ElementCategory::Theme,
         ElementCategory::Finale,
     ];
-    
+
     HttpResponse::Ok().json(json!({
         "categories": categories.iter().map(|c| format!("{:?}", c)).collect::<Vec<_>>()
     }))
@@ -96,9 +97,9 @@ async fn search_hollywood_elements(
 ) -> impl Responder {
     let category = query.get("category").and_then(|v| v.as_str());
     let search_term = query.get("q").and_then(|v| v.as_str());
-    
+
     let elements: Vec<_> = data.compatibility_matrix.elements.values().cloned().collect();
-    
+
     let filtered_elements: Vec<_> = elements.into_iter()
         .filter(|e| {
             let matches_category = category.map_or(true, |c| format!("{:?}", e.category).to_lowercase() == c.to_lowercase());
@@ -110,54 +111,9 @@ async fn search_hollywood_elements(
             matches_category && matches_search
         })
         .collect();
-    
+
     HttpResponse::Ok().json(json!({
         "elements": filtered_elements,
         "count": filtered_elements.len()
     }))
-}
-
-// Implement compatibility calculation for CompatibilityMatrix
-impl CompatibilityMatrix {
-    pub fn calculate_compatibility(
-        &self,
-        a_id: &str,
-        b_id: &str,
-        _context: Option<&str>,
-    ) -> Result<CompatibilityResult, String> {
-        let a = self.elements.get(a_id)
-            .ok_or_else(|| format!("Element {} not found", a_id))?;
-        let b = self.elements.get(b_id)
-            .ok_or_else(|| format!("Element {} not found", b_id))?;
-        
-        let pair_type = self.get_pair_type(a, b);
-        
-        // Calculate score based on rules
-        let mut total_score = 0.0f32;
-        let mut count = 0;
-        
-        if let Some(rules) = self.rules.get(&pair_type) {
-            for (axis, weight) in rules {
-                // Here you would calculate the actual compatibility based on the axis
-                // For now, return a default score
-                total_score += weight;
-                count += 1;
-            }
-        }
-        
-        let score = if count > 0 {
-            total_score / count as f32
-        } else {
-            0.5 // Default neutral score
-        };
-        
-        Ok(CompatibilityResult {
-            score,
-            category: CompatibilityCategory::discretize_score(score),
-            axis_scores: HashMap::new(),
-            penalties: Vec::new(),
-            bonuses: Vec::new(),
-            explanation: vec!["Compatibility calculated based on Hollywood Animal rules".to_string()],
-        })
-    }
 }
