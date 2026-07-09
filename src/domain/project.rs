@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
+use std::str::FromStr;
 
 /// Status of a project
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -16,6 +17,20 @@ pub enum ProjectStatus {
 impl Default for ProjectStatus {
     fn default() -> Self {
         ProjectStatus::Draft
+    }
+}
+
+impl FromStr for ProjectStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "draft" => Ok(ProjectStatus::Draft),
+            "in_progress" => Ok(ProjectStatus::InProgress),
+            "completed" => Ok(ProjectStatus::Completed),
+            "archived" => Ok(ProjectStatus::Archived),
+            _ => Err(format!("Unknown project status: {}", s)),
+        }
     }
 }
 
