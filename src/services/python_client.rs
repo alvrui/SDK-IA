@@ -10,6 +10,7 @@ use crate::config::AppConfig;
 
 /// Error type for Python service communication
 #[derive(Error, Debug)]
+#[derive(Error, Debug)]
 pub enum PythonClientError {
     #[error("Request failed: {0}")]
     RequestFailed(String),
