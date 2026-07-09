@@ -260,12 +260,12 @@ pub async fn update_project(
                     project.updated_at = Utc::now();
                     
                     // Determine version change type
-                    let change_type = data.VersioningService::determine_project_change_type(
+                    let change_type = VersioningService::determine_project_change_type(
                         &original_project, &project
                     );
                     
                     // Apply version bump
-                    data.VersioningService::apply_project_version_bump(&mut project, change_type);
+                    VersioningService::apply_project_version_bump(&mut project, change_type);
 
                     match data.persistence.update_project(&project) {
                         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
@@ -353,7 +353,7 @@ pub async fn create_narrative(
                     // Bump project version (MINOR change for adding narrative)
                     if let Ok(Some(mut project)) = data.persistence.get_project(&project_id_uuid) {
                         let change_type = VersionChangeType::Minor;
-                        data.VersioningService::apply_project_version_bump(&mut project, change_type);
+                        VersioningService::apply_project_version_bump(&mut project, change_type);
                         if let Err(e) = data.persistence.update_project(&project) {
                             eprintln!("Failed to update project version: {}", e);
                         }
@@ -512,12 +512,12 @@ pub async fn update_narrative(
                     narrative.updated_at = Utc::now();
                     
                     // Determine version change type
-                    let change_type = data.VersioningService::determine_narrative_change_type(
+                    let change_type = VersioningService::determine_narrative_change_type(
                         &original_narrative, &narrative
                     );
                     
                     // Apply version bump
-                    data.VersioningService::apply_narrative_version_bump(&mut narrative, change_type);
+                    VersioningService::apply_narrative_version_bump(&mut narrative, change_type);
 
                     // Recalculate compatibility score
                     if let Err(e) = data.narrative_service.recalculate_narrative_compatibility(id) {
@@ -573,7 +573,7 @@ pub async fn delete_narrative(
                     if let Some(project_id) = project_id {
                         if let Ok(Some(mut project)) = data.persistence.get_project(&project_id) {
                             let change_type = VersionChangeType::Minor;
-                            data.VersioningService::apply_project_version_bump(&mut project, change_type);
+                            VersioningService::apply_project_version_bump(&mut project, change_type);
                             if let Err(e) = data.persistence.update_project(&project) {
                                 eprintln!("Failed to update project version: {}", e);
                             }
@@ -640,7 +640,7 @@ pub async fn create_story_element(
                     // Bump narrative version (MINOR change for adding element)
                     if let Ok(Some(mut narrative)) = data.persistence.get_narrative(&narrative_id_uuid) {
                         let change_type = VersionChangeType::Minor;
-                        data.VersioningService::apply_narrative_version_bump(&mut narrative, change_type);
+                        VersioningService::apply_narrative_version_bump(&mut narrative, change_type);
                         if let Err(e) = data.persistence.update_narrative(&narrative) {
                             eprintln!("Failed to update narrative version: {}", e);
                         }
@@ -858,7 +858,7 @@ pub async fn delete_story_element(
                         // Bump narrative version (MINOR change for removing element)
                         if let Ok(Some(mut narrative)) = data.persistence.get_narrative(&narrative_id) {
                             let change_type = VersionChangeType::Minor;
-                            data.VersioningService::apply_narrative_version_bump(&mut narrative, change_type);
+                            VersioningService::apply_narrative_version_bump(&mut narrative, change_type);
                             if let Err(e) = data.persistence.update_narrative(&narrative) {
                                 eprintln!("Failed to update narrative version: {}", e);
                             }
