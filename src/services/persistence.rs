@@ -13,20 +13,17 @@ pub struct PersistenceService {
 }
 
 impl PersistenceService {
-    /// Create a new persistence service instance
     pub fn new(database_path: &str) -> Result<Self> {
         let path = Path::new(database_path);
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| rusqlite::Error::from(e))?;
+            std::fs::create_dir_all(parent)?;
         }
         let conn = Connection::open(database_path)?;
         Self::initialize_database(&conn)?;
         Ok(Self { conn })
     }
 
-    /// Initialize database tables
     fn initialize_database(conn: &Connection) -> Result<()> {
-        // Projects table
         conn.execute(
             "CREATE TABLE IF NOT EXISTS projects (
                 id TEXT PRIMARY KEY,
@@ -44,7 +41,6 @@ impl PersistenceService {
             [],
         )?;
 
-        // Narratives table
         conn.execute(
             "CREATE TABLE IF NOT EXISTS narratives (
                 id TEXT PRIMARY KEY,
@@ -64,7 +60,6 @@ impl PersistenceService {
             [],
         )?;
 
-        // Story elements table
         conn.execute(
             "CREATE TABLE IF NOT EXISTS story_elements (
                 id TEXT PRIMARY KEY,
@@ -81,7 +76,6 @@ impl PersistenceService {
             [],
         )?;
 
-        // Game events table
         conn.execute(
             "CREATE TABLE IF NOT EXISTS game_events (
                 id TEXT PRIMARY KEY,
@@ -104,7 +98,6 @@ impl PersistenceService {
             [],
         )?;
 
-        // Create indexes for better query performance
         conn.execute("CREATE INDEX IF NOT EXISTS idx_narratives_project_id ON narratives(project_id)", [])?;
         conn.execute("CREATE INDEX IF NOT EXISTS idx_story_elements_narrative_id ON story_elements(narrative_id)", [])?;
         conn.execute("CREATE INDEX IF NOT EXISTS idx_game_events_narrative_id ON game_events(narrative_id)", [])?;
@@ -112,9 +105,17 @@ impl PersistenceService {
         Ok(())
     }
 
-    // ==================== PROJECT OPERATIONS ====================
+    fn parse_datetime_utc(s: &str) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339(s)
+            .map(|dt: DateTime<FixedOffset>| dt.with_timezone(&Utc))
+            .unwrap_or_else(|_| Utc::now())
+    }
 
-    /// Create a new project
+    fn parse_optional_datetime_utc(s: Option<String>) -> Option<DateTime<Utc>> {
+        s.and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
+            .map(|dt: DateTime<FixedOffset>| dt.with_timezone(&Utc))
+    }
+
     pub fn create_project(&self, project: &Project) -> Result<Uuid> {
         let tags_json = serde_json::to_string(&project.tags).unwrap_or("[]".to_string());
         let settings_json = serde_json::to_string(&project.settings).unwrap_or("{{}}".to_string());
@@ -140,26 +141,12 @@ impl PersistenceService {
         Ok(project.id)
     }
 
-    /// Helper function to parse DateTime from RFC3339 string and convert to Utc
-    fn parse_datetime_utc(s: &str) -> DateTime<Utc> {
-        DateTime::parse_from_rfc3339(s)
-            .map(|dt: DateTime<FixedOffset>| dt.with_timezone(&Utc))
-            .unwrap_or_else(|_| Utc::now())
-    }
-
-    /// Helper function to parse optional DateTime from RFC3339 string and convert to Utc
-    fn parse_optional_datetime_utc(s: Option<String>) -> Option<DateTime<Utc>> {
-        s.and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
-            .map(|dt: DateTime<FixedOffset>| dt.with_timezone(&Utc))
-    }
-
-    /// Get a project by ID
     pub fn get_project(&self, id: &Uuid) -> Result<Option<Project>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, name, description, author, created_at, updated_at, version, status, tags, settings, metadata 
              FROM projects WHERE id = ?1"
         )?;
-        
+
         let mut rows = stmt.query_map(params![id.to_string()], |row| {
             Ok(Project {
                 id: Uuid::parse_str(row.get::<_, String>(0)?.as_str()).unwrap_or(*id),
@@ -175,7 +162,7 @@ impl PersistenceService {
                 metadata: serde_json::from_str(&row.get::<_, String>(10)?).unwrap_or_default(),
             })
         })?;
-        
+
         if let Some(row) = rows.next()? {
             Ok(Some(row?))
         } else {
@@ -183,14 +170,13 @@ impl PersistenceService {
         }
     }
 
-    /// List all projects with pagination
     pub fn list_projects(&self, page: u32, page_size: u32) -> Result<Vec<Project>> {
         let offset = (page - 1) * page_size;
         let mut stmt = self.conn.prepare(
             "SELECT id, name, description, author, created_at, updated_at, version, status, tags, settings, metadata 
              FROM projects ORDER BY created_at DESC LIMIT ?1 OFFSET ?2"
         )?;
-        
+
         let mut projects = Vec::new();
         let mut rows = stmt.query_map(params![page_size, offset], |row| {
             Ok(Project {
@@ -207,15 +193,14 @@ impl PersistenceService {
                 metadata: serde_json::from_str(&row.get::<_, String>(10)?).unwrap_or_default(),
             })
         })?;
-        
+
         while let Some(row) = rows.next()? {
             projects.push(row?);
         }
-        
+
         Ok(projects)
     }
 
-    /// Update a project
     pub fn update_project(&self, project: &Project) -> Result<()> {
         let tags_json = serde_json::to_string(&project.tags).unwrap_or("[]".to_string());
         let settings_json = serde_json::to_string(&project.settings).unwrap_or("{{}}".to_string());
@@ -242,27 +227,18 @@ impl PersistenceService {
         Ok(())
     }
 
-    /// Delete a project and all its related data (cascade delete)
-    pub fn delete_project(&self, id: &Uuid) -> Result<()> {
+    pub fn delete_project(&mut self, id: &Uuid) -> Result<()> {
         let mut tx = self.conn.transaction()?;
-        
-        // Delete game events
+
         tx.execute("DELETE FROM game_events WHERE narrative_id IN (SELECT id FROM narratives WHERE project_id = ?1)", params![id.to_string()])?;
-        
-        // Delete story elements
         tx.execute("DELETE FROM story_elements WHERE narrative_id IN (SELECT id FROM narratives WHERE project_id = ?1)", params![id.to_string()])?;
-        
-        // Delete narratives
         tx.execute("DELETE FROM narratives WHERE project_id = ?1", params![id.to_string()])?;
-        
-        // Delete project
         tx.execute("DELETE FROM projects WHERE id = ?1", params![id.to_string()])?;
-        
+
         tx.commit()?;
         Ok(())
     }
 
-    /// Count total projects
     pub fn count_projects(&self) -> Result<i64> {
         let count: i64 = self.conn.query_row(
             "SELECT COUNT(*) FROM projects",
@@ -272,9 +248,6 @@ impl PersistenceService {
         Ok(count)
     }
 
-    // ==================== NARRATIVE OPERATIONS ====================
-
-    /// Create a new narrative
     pub fn create_narrative(&self, narrative: &Narrative) -> Result<Uuid> {
         let theme_ids_json = serde_json::to_string(&narrative.theme_ids).unwrap_or("[]".to_string());
         let metadata_json = serde_json::to_string(&narrative.metadata).unwrap_or("{{}}".to_string());
@@ -300,13 +273,12 @@ impl PersistenceService {
         Ok(narrative.id)
     }
 
-    /// Get a narrative by ID
     pub fn get_narrative(&self, id: &Uuid) -> Result<Option<Narrative>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, project_id, title, synopsis, status, created_at, updated_at, version, theme_ids, compatibility_score, context_summary, metadata 
              FROM narratives WHERE id = ?1"
         )?;
-        
+
         let mut rows = stmt.query_map(params![id.to_string()], |row| {
             Ok(Narrative {
                 id: Uuid::parse_str(row.get::<_, String>(0)?.as_str()).unwrap_or(*id),
@@ -323,7 +295,7 @@ impl PersistenceService {
                 metadata: serde_json::from_str(&row.get::<_, String>(11)?).unwrap_or_default(),
             })
         })?;
-        
+
         if let Some(row) = rows.next()? {
             Ok(Some(row?))
         } else {
@@ -331,13 +303,12 @@ impl PersistenceService {
         }
     }
 
-    /// List narratives by project ID
     pub fn list_narratives_by_project(&self, project_id: &Uuid) -> Result<Vec<Narrative>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, project_id, title, synopsis, status, created_at, updated_at, version, theme_ids, compatibility_score, context_summary, metadata 
              FROM narratives WHERE project_id = ?1 ORDER BY created_at DESC"
         )?;
-        
+
         let mut narratives = Vec::new();
         let mut rows = stmt.query_map(params![project_id.to_string()], |row| {
             Ok(Narrative {
@@ -355,15 +326,14 @@ impl PersistenceService {
                 metadata: serde_json::from_str(&row.get::<_, String>(11)?).unwrap_or_default(),
             })
         })?;
-        
+
         while let Some(row) = rows.next()? {
             narratives.push(row?);
         }
-        
+
         Ok(narratives)
     }
 
-    /// Update a narrative
     pub fn update_narrative(&self, narrative: &Narrative) -> Result<()> {
         let theme_ids_json = serde_json::to_string(&narrative.theme_ids).unwrap_or("[]".to_string());
         let metadata_json = serde_json::to_string(&narrative.metadata).unwrap_or("{{}}".to_string());
@@ -389,21 +359,17 @@ impl PersistenceService {
         Ok(())
     }
 
-    /// Delete a narrative and all its related data
-    pub fn delete_narrative(&self, id: &Uuid) -> Result<()> {
+    pub fn delete_narrative(&mut self, id: &Uuid) -> Result<()> {
         let mut tx = self.conn.transaction()?;
-        
+
         tx.execute("DELETE FROM game_events WHERE narrative_id = ?1", params![id.to_string()])?;
         tx.execute("DELETE FROM story_elements WHERE narrative_id = ?1", params![id.to_string()])?;
         tx.execute("DELETE FROM narratives WHERE id = ?1", params![id.to_string()])?;
-        
+
         tx.commit()?;
         Ok(())
     }
 
-    // ==================== STORY ELEMENT OPERATIONS ====================
-
-    /// Create a new story element
     pub fn create_story_element(&self, element: &StoryElement) -> Result<Uuid> {
         let attributes_json = serde_json::to_string(&element.attributes).unwrap_or("{{}}".to_string());
 
@@ -425,13 +391,12 @@ impl PersistenceService {
         Ok(element.id)
     }
 
-    /// Get a story element by ID
     pub fn get_story_element(&self, id: &Uuid) -> Result<Option<StoryElement>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, narrative_id, element_type, hollywood_element_id, name, description, attributes, created_at, compatibility_score 
              FROM story_elements WHERE id = ?1"
         )?;
-        
+
         let mut rows = stmt.query_map(params![id.to_string()], |row| {
             Ok(StoryElement {
                 id: Uuid::parse_str(row.get::<_, String>(0)?.as_str()).unwrap_or(*id),
@@ -445,7 +410,7 @@ impl PersistenceService {
                 compatibility_score: row.get(8)?,
             })
         })?;
-        
+
         if let Some(row) = rows.next()? {
             Ok(Some(row?))
         } else {
@@ -453,13 +418,12 @@ impl PersistenceService {
         }
     }
 
-    /// List story elements by narrative ID
     pub fn list_story_elements_by_narrative(&self, narrative_id: &Uuid) -> Result<Vec<StoryElement>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, narrative_id, element_type, hollywood_element_id, name, description, attributes, created_at, compatibility_score 
              FROM story_elements WHERE narrative_id = ?1 ORDER BY created_at DESC"
         )?;
-        
+
         let mut elements = Vec::new();
         let mut rows = stmt.query_map(params![narrative_id.to_string()], |row| {
             Ok(StoryElement {
@@ -474,22 +438,21 @@ impl PersistenceService {
                 compatibility_score: row.get(8)?,
             })
         })?;
-        
+
         while let Some(row) = rows.next()? {
             elements.push(row?);
         }
-        
+
         Ok(elements)
     }
 
-    /// List story elements by narrative ID and type
     pub fn list_story_elements_by_type(&self, narrative_id: &Uuid, element_type: StoryElementType) -> Result<Vec<StoryElement>> {
         let type_str = format!("{:?}", element_type);
         let mut stmt = self.conn.prepare(
             "SELECT id, narrative_id, element_type, hollywood_element_id, name, description, attributes, created_at, compatibility_score 
              FROM story_elements WHERE narrative_id = ?1 AND element_type = ?2 ORDER BY created_at DESC"
         )?;
-        
+
         let mut elements = Vec::new();
         let mut rows = stmt.query_map(params![narrative_id.to_string(), type_str], |row| {
             Ok(StoryElement {
@@ -504,15 +467,14 @@ impl PersistenceService {
                 compatibility_score: row.get(8)?,
             })
         })?;
-        
+
         while let Some(row) = rows.next()? {
             elements.push(row?);
         }
-        
+
         Ok(elements)
     }
 
-    /// Update a story element
     pub fn update_story_element(&self, element: &StoryElement) -> Result<()> {
         let attributes_json = serde_json::to_string(&element.attributes).unwrap_or("{{}}".to_string());
 
@@ -535,7 +497,6 @@ impl PersistenceService {
         Ok(())
     }
 
-    /// Delete a story element
     pub fn delete_story_element(&self, id: &Uuid) -> Result<()> {
         self.conn.execute(
             "DELETE FROM story_elements WHERE id = ?1",
@@ -544,9 +505,6 @@ impl PersistenceService {
         Ok(())
     }
 
-    // ==================== GAME EVENT OPERATIONS ====================
-
-    /// Create a new game event
     pub fn create_game_event(&self, event: &GameEvent) -> Result<Uuid> {
         let character_ids_json = serde_json::to_string(&event.character_ids).unwrap_or("[]".to_string());
         let location_ids_json = serde_json::to_string(&event.location_ids).unwrap_or("[]".to_string());
@@ -577,13 +535,12 @@ impl PersistenceService {
         Ok(event.id)
     }
 
-    /// Get a game event by ID
     pub fn get_game_event(&self, id: &Uuid) -> Result<Option<GameEvent>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, narrative_id, event_type, title, description, text, character_ids, location_ids, images, hollywood_event_id, timestamp, order_index, attributes, created_at, updated_at 
              FROM game_events WHERE id = ?1"
         )?;
-        
+
         let mut rows = stmt.query_map(params![id.to_string()], |row| {
             Ok(GameEvent {
                 id: Uuid::parse_str(row.get::<_, String>(0)?.as_str()).unwrap_or(*id),
@@ -603,7 +560,7 @@ impl PersistenceService {
                 updated_at: Self::parse_datetime_utc(&row.get::<_, String>(14)?),
             })
         })?;
-        
+
         if let Some(row) = rows.next()? {
             Ok(Some(row?))
         } else {
@@ -611,13 +568,12 @@ impl PersistenceService {
         }
     }
 
-    /// List game events by narrative ID
     pub fn list_game_events_by_narrative(&self, narrative_id: &Uuid) -> Result<Vec<GameEvent>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, narrative_id, event_type, title, description, text, character_ids, location_ids, images, hollywood_event_id, timestamp, order_index, attributes, created_at, updated_at 
              FROM game_events WHERE narrative_id = ?1 ORDER BY order_index ASC, created_at DESC"
         )?;
-        
+
         let mut events = Vec::new();
         let mut rows = stmt.query_map(params![narrative_id.to_string()], |row| {
             Ok(GameEvent {
@@ -638,15 +594,14 @@ impl PersistenceService {
                 updated_at: Self::parse_datetime_utc(&row.get::<_, String>(14)?),
             })
         })?;
-        
+
         while let Some(row) = rows.next()? {
             events.push(row?);
         }
-        
+
         Ok(events)
     }
 
-    /// Update a game event
     pub fn update_game_event(&self, event: &GameEvent) -> Result<()> {
         let character_ids_json = serde_json::to_string(&event.character_ids).unwrap_or("[]".to_string());
         let location_ids_json = serde_json::to_string(&event.location_ids).unwrap_or("[]".to_string());
@@ -679,7 +634,6 @@ impl PersistenceService {
         Ok(())
     }
 
-    /// Delete a game event
     pub fn delete_game_event(&self, id: &Uuid) -> Result<()> {
         self.conn.execute(
             "DELETE FROM game_events WHERE id = ?1",
@@ -688,9 +642,6 @@ impl PersistenceService {
         Ok(())
     }
 
-    // ==================== SEARCH OPERATIONS ====================
-
-    /// Search projects by various criteria
     pub fn search_projects(
         &self,
         name: Option<&str>,
@@ -700,8 +651,7 @@ impl PersistenceService {
         page: u32,
         page_size: u32,
     ) -> Result<Vec<Project>> {
-        let mut query = "SELECT id, name, description, author, created_at, updated_at, version, status, tags, settings, metadata 
-                         FROM projects".to_string();
+        let mut query = "SELECT id, name, description, author, created_at, updated_at, version, status, tags, settings, metadata FROM projects".to_string();
         let mut conditions = Vec::new();
         let mut params: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
@@ -720,7 +670,7 @@ impl PersistenceService {
         if let Some(tags) = tags {
             for (i, tag) in tags.iter().enumerate() {
                 conditions.push(format!("tags LIKE ?{}", i + 4));
-                params.push(Box::new(format!("%"{}"", tag)));
+                params.push(Box::new(format!("%{}%", tag)));
             }
         }
 
@@ -758,7 +708,6 @@ impl PersistenceService {
         Ok(projects)
     }
 
-    /// Count projects matching search criteria
     pub fn count_projects_search(
         &self,
         name: Option<&str>,
@@ -785,7 +734,7 @@ impl PersistenceService {
         if let Some(tags) = tags {
             for (i, tag) in tags.iter().enumerate() {
                 conditions.push(format!("tags LIKE ?{}", i + 4));
-                params.push(Box::new(format!("%"{}"", tag)));
+                params.push(Box::new(format!("%{}%", tag)));
             }
         }
 
