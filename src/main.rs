@@ -15,6 +15,7 @@ mod web;
 use crate::app_data::AppData;
 use crate::services::persistence::PersistenceService;
 use crate::services::narrative::NarrativeService;
+use crate::services::validation::DomainValidationService;
 use crate::domain::hollywood_animal::CompatibilityMatrix;
 
 async fn health_check() -> impl Responder {
@@ -50,10 +51,17 @@ async fn main() -> io::Result<()> {
         compatibility_matrix.clone()
     ));
     
+    // Initialize validation service
+    let validation_service = Arc::new(DomainValidationService::new(
+        persistence.clone(),
+        compatibility_matrix.clone()
+    ));
+    
     // Build application data
     let app_data = web::Data::new(AppData {
         persistence: persistence.clone(),
         narrative_service,
+        validation_service,
         compatibility_matrix,
     });
     
