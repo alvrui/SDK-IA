@@ -10,6 +10,7 @@ description = "Unified application for AI-assisted narrative generation"
 actix-web = "4"
 actix-rt = "2"
 actix-cors = "0.7"
+actix-files = "0.6"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -41,6 +42,9 @@ reqwest = { version = "0.11", features = ["json"] }
 
 # Configuration
 config = "0.13"
+
+# Error handling
+thiserror = "1.0"
 
 [dev-dependencies]
 actix-rt = "2"
