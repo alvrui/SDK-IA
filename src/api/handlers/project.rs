@@ -9,7 +9,7 @@ use crate::domain::{Project, Narrative, StoryElement, GameEvent, ProjectStatus, 
 use crate::services::persistence::PersistenceService;
 use crate::services::narrative::NarrativeService;
 use crate::domain::hollywood_animal::CompatibilityMatrix;
-use crate::main::AppData;
+use crate::app_data::AppData;
 
 // ==================== REQUEST/RESPONSE TYPES ====================
 
