@@ -1,7 +1,7 @@
 // SDK-IA Rust Backend
 // Main entry point for the application
 
-use actix_web::{web, App, HttpServer, Responder, HttpResponse};
+use actix_web::{web as actix_web, App, HttpServer, Responder, HttpResponse};
 use std::io;
 use std::sync::Arc;
 
@@ -66,7 +66,7 @@ async fn main() -> io::Result<()> {
     let versioning_service = Arc::new(VersioningService);
     
     // Build application data
-    let app_data = web::Data::new(AppData {
+    let app_data = actix_web::Data::new(AppData {
         persistence: persistence.clone(),
         narrative_service,
         validation_service,
@@ -78,9 +78,9 @@ async fn main() -> io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(app_data.clone())
-            .route("/api/v1/internal/health", web::get().to(health_check))
-            .service(api::routes::configure())
-            .service(web::configure())
+            .route("/api/v1/internal/health", actix_web::get().to(health_check))
+            .configure(api::routes::configure)
+            .configure(web::configure)
     })
     .bind("127.0.0.1:9090")?
     .run()
