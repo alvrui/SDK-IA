@@ -7,6 +7,7 @@ use std::str::FromStr;
 
 use crate::domain::{Project, Narrative, StoryElement, GameEvent, ProjectStatus, NarrativeStatus, StoryElementType, EventType};
 use crate::services::validation::{ValidationResult, ValidationError, ValidationSeverity};
+use crate::services::versioning::{VersioningService, VersionChangeType};
 use crate::services::persistence::PersistenceService;
 use crate::services::narrative::NarrativeService;
 use crate::domain::hollywood_animal::CompatibilityMatrix;
@@ -224,7 +225,7 @@ pub async fn list_projects(
     }
 }
 
-/// Update a project
+/// Update a project with automatic versioning
 pub async fn update_project(
     data: web::Data<Arc<AppData>>,
     project_id: web::Path<String>,
@@ -234,6 +235,8 @@ pub async fn update_project(
         Ok(id) => {
             match data.persistence.get_project(&id) {
                 Ok(Some(mut project)) => {
+                    let original_project = project.clone();
+                    
                     if let Some(name) = &payload.name {
                         project.name = name.clone();
                     }
@@ -255,13 +258,21 @@ pub async fn update_project(
                         project.metadata = metadata.clone();
                     }
                     project.updated_at = Utc::now();
-                    project.update_version("patch");
+                    
+                    // Determine version change type
+                    let change_type = data.versioning_service.determine_project_change_type(
+                        &original_project, &project
+                    );
+                    
+                    // Apply version bump
+                    data.versioning_service.apply_project_version_bump(&mut project, change_type);
 
                     match data.persistence.update_project(&project) {
                         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
                             "status": "success",
                             "data": project,
-                            "message": "Project updated successfully"
+                            "message": "Project updated successfully",
+                            "version_change": format!("{:?}", change_type)
                         })),
                         Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
                             "status": "error",
@@ -313,7 +324,7 @@ pub async fn delete_project(
 
 // ==================== NARRATIVE ENDPOINTS ====================
 
-/// Create a new narrative with automatic compatibility calculation
+/// Create a new narrative with automatic compatibility calculation and versioning
 pub async fn create_narrative(
     data: web::Data<Arc<AppData>>,
     project_id: web::Path<String>,
@@ -339,6 +350,15 @@ pub async fn create_narrative(
                 payload.metadata.clone(),
             ) {
                 Ok(id) => {
+                    // Bump project version (MINOR change for adding narrative)
+                    if let Ok(Some(mut project)) = data.persistence.get_project(&project_id_uuid) {
+                        let change_type = VersionChangeType::Minor;
+                        data.versioning_service.apply_project_version_bump(&mut project, change_type);
+                        if let Err(e) = data.persistence.update_project(&project) {
+                            eprintln!("Failed to update project version: {}", e);
+                        }
+                    }
+                    
                     // Get the created narrative to return full data
                     if let Ok(Some(narrative)) = data.persistence.get_narrative(&id) {
                         HttpResponse::Created().json(serde_json::json!({
@@ -350,7 +370,8 @@ pub async fn create_narrative(
                                 "compatibility_score": narrative.compatibility_score,
                                 "version": narrative.version,
                                 "created_at": narrative.created_at.to_rfc3339()
-                            }
+                            },
+                            "message": "Narrative created with compatibility score and project version bumped"
                         }))
                     } else {
                         HttpResponse::Created().json(serde_json::json!({
@@ -447,7 +468,7 @@ pub async fn list_narratives(
     }
 }
 
-/// Update a narrative
+/// Update a narrative with automatic versioning
 pub async fn update_narrative(
     data: web::Data<Arc<AppData>>,
     narrative_id: web::Path<String>,
@@ -469,6 +490,8 @@ pub async fn update_narrative(
 
             match data.persistence.get_narrative(&id) {
                 Ok(Some(mut narrative)) => {
+                    let original_narrative = narrative.clone();
+                    
                     if let Some(title) = &payload.title {
                         narrative.title = title.clone();
                     }
@@ -487,7 +510,14 @@ pub async fn update_narrative(
                         narrative.metadata = metadata.clone();
                     }
                     narrative.updated_at = Utc::now();
-                    narrative.update_version("patch");
+                    
+                    // Determine version change type
+                    let change_type = data.versioning_service.determine_narrative_change_type(
+                        &original_narrative, &narrative
+                    );
+                    
+                    // Apply version bump
+                    data.versioning_service.apply_narrative_version_bump(&mut narrative, change_type);
 
                     // Recalculate compatibility score
                     if let Err(e) = data.narrative_service.recalculate_narrative_compatibility(id) {
@@ -498,7 +528,8 @@ pub async fn update_narrative(
                         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
                             "status": "success",
                             "data": narrative,
-                            "message": "Narrative updated successfully"
+                            "message": "Narrative updated successfully",
+                            "version_change": format!("{:?}", change_type)
                         })),
                         Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
                             "status": "error",
@@ -523,18 +554,37 @@ pub async fn update_narrative(
     }
 }
 
-/// Delete a narrative
+/// Delete a narrative with automatic versioning
 pub async fn delete_narrative(
     data: web::Data<Arc<AppData>>,
     narrative_id: web::Path<String>,
 ) -> impl Responder {
     match Uuid::parse_str(&narrative_id.into_inner()) {
         Ok(id) => {
+            // Get project_id before deleting
+            let project_id = match data.persistence.get_narrative(&id) {
+                Ok(Some(narrative)) => Some(narrative.project_id),
+                _ => None,
+            };
+            
             match data.persistence.delete_narrative(&id) {
-                Ok(_) => HttpResponse::Ok().json(serde_json::json!({
-                    "status": "success",
-                    "message": "Narrative and all related data deleted successfully"
-                })),
+                Ok(_) => {
+                    // Bump project version (MINOR change for removing narrative)
+                    if let Some(project_id) = project_id {
+                        if let Ok(Some(mut project)) = data.persistence.get_project(&project_id) {
+                            let change_type = VersionChangeType::Minor;
+                            data.versioning_service.apply_project_version_bump(&mut project, change_type);
+                            if let Err(e) = data.persistence.update_project(&project) {
+                                eprintln!("Failed to update project version: {}", e);
+                            }
+                        }
+                    }
+                    
+                    HttpResponse::Ok().json(serde_json::json!({
+                        "status": "success",
+                        "message": "Narrative and all related data deleted and project version bumped"
+                    }))
+                }
                 Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
                     "status": "error",
                     "error": e.to_string()
@@ -550,7 +600,7 @@ pub async fn delete_narrative(
 
 // ==================== STORY ELEMENT ENDPOINTS ====================
 
-/// Create a new story element with validation
+/// Create a new story element with validation and automatic versioning
 pub async fn create_story_element(
     data: web::Data<Arc<AppData>>,
     narrative_id: web::Path<String>,
@@ -587,6 +637,15 @@ pub async fn create_story_element(
 
             match data.narrative_service.add_story_element_and_recalculate(narrative_id_uuid, &element) {
                 Ok(_) => {
+                    // Bump narrative version (MINOR change for adding element)
+                    if let Ok(Some(mut narrative)) = data.persistence.get_narrative(&narrative_id_uuid) {
+                        let change_type = VersionChangeType::Minor;
+                        data.versioning_service.apply_narrative_version_bump(&mut narrative, change_type);
+                        if let Err(e) = data.persistence.update_narrative(&narrative) {
+                            eprintln!("Failed to update narrative version: {}", e);
+                        }
+                    }
+                    
                     // Get the created element to return ID
                     if let Ok(Some(created_element)) = data.persistence.get_story_element(&element.id) {
                         HttpResponse::Created().json(serde_json::json!({
@@ -599,7 +658,7 @@ pub async fn create_story_element(
                                 "name": created_element.name,
                                 "created_at": created_element.created_at.to_rfc3339()
                             },
-                            "message": "Story element created and narrative compatibility recalculated"
+                            "message": "Story element created, narrative compatibility recalculated, and version bumped"
                         }))
                     } else {
                         HttpResponse::Created().json(serde_json::json!({
@@ -775,7 +834,7 @@ pub async fn update_story_element(
     }
 }
 
-/// Delete a story element
+/// Delete a story element with automatic versioning
 pub async fn delete_story_element(
     data: web::Data<Arc<AppData>>,
     element_id: web::Path<String>,
@@ -790,16 +849,25 @@ pub async fn delete_story_element(
 
             match data.persistence.delete_story_element(&id) {
                 Ok(_) => {
-                    // Recalculate narrative compatibility if we have the narrative_id
+                    // Recalculate narrative compatibility and bump version
                     if let Some(narrative_id) = narrative_id {
                         if let Err(e) = data.narrative_service.recalculate_narrative_compatibility(narrative_id) {
                             eprintln!("Failed to recalculate compatibility: {}", e);
+                        }
+                        
+                        // Bump narrative version (MINOR change for removing element)
+                        if let Ok(Some(mut narrative)) = data.persistence.get_narrative(&narrative_id) {
+                            let change_type = VersionChangeType::Minor;
+                            data.versioning_service.apply_narrative_version_bump(&mut narrative, change_type);
+                            if let Err(e) = data.persistence.update_narrative(&narrative) {
+                                eprintln!("Failed to update narrative version: {}", e);
+                            }
                         }
                     }
                     
                     HttpResponse::Ok().json(serde_json::json!({
                         "status": "success",
-                        "message": "Story element deleted and narrative compatibility recalculated"
+                        "message": "Story element deleted, narrative compatibility recalculated, and version bumped"
                     }))
                 }
                 Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
