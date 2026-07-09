@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
+use std::str::FromStr;
 
 /// Status of a narrative
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -17,6 +18,21 @@ pub enum NarrativeStatus {
 impl Default for NarrativeStatus {
     fn default() -> Self {
         NarrativeStatus::Outline
+    }
+}
+
+impl FromStr for NarrativeStatus {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "outline" => Ok(NarrativeStatus::Outline),
+            "in_development" => Ok(NarrativeStatus::InDevelopment),
+            "review" => Ok(NarrativeStatus::Review),
+            "completed" => Ok(NarrativeStatus::Completed),
+            "archived" => Ok(NarrativeStatus::Archived),
+            _ => Err(format!("Unknown narrative status: {}", s)),
+        }
     }
 }
 
