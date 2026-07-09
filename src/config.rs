@@ -1,9 +1,9 @@
 // Configuration module for SDK-IA
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::env;
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AppConfig {
     pub server_host: String,
     pub server_port: u16,
