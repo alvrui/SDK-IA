@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
+use std::str::FromStr;
 
 /// Type of story element
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -17,6 +18,21 @@ pub enum StoryElementType {
 impl Default for StoryElementType {
     fn default() -> Self {
         StoryElementType::Protagonist
+    }
+}
+
+impl FromStr for StoryElementType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "protagonist" => Ok(StoryElementType::Protagonist),
+            "antagonist" => Ok(StoryElementType::Antagonist),
+            "finale" => Ok(StoryElementType::Finale),
+            "location" => Ok(StoryElementType::Location),
+            "theme" => Ok(StoryElementType::Theme),
+            _ => Err(format!("Unknown story element type: {}", s)),
+        }
     }
 }
 
