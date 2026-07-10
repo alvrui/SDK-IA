@@ -24,15 +24,15 @@ app = FastAPI(
     title="Secretario API",
     description="Mistral Agent Management Service for Cadiz12 Project",
     version="0.1.0",
-    docs_url="/api/v1/internal/docs",
-    redoc_url="/api/v1/internal/redoc",
-    openapi_url="/api/v1/internal/openapi.json",
+    docs_url="/api/v1/docs",
+    redoc_url="/api/v1/redoc",
+    openapi_url="/api/v1/openapi.json",
 )
 
-# CORS configuration
+# CORS configuration - Allow frontend (3000), Rust backend (9090), and direct access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:9090", "http://127.0.0.1:9090"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:9090", "http://127.0.0.1:9090"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -43,8 +43,8 @@ mistral_client = MistralClient(api_key=settings.MISTRAL_API_KEY)
 storage = ConversationStorage(database_path=settings.DATABASE_PATH)
 agent_manager = AgentManager(storage=storage, client=mistral_client)
 
-# Include routers
-app.include_router(agents_router, prefix="/api/v1/internal/agents")
+# Include routers - Use /api/v1/agents (not /api/v1/internal/agents) to match frontend calls
+app.include_router(agents_router, prefix="/api/v1/agents")
 
 
 @app.get("/api/v1/internal/health")
