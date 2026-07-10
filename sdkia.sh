@@ -1,3 +1,5 @@
+url: https://raw.githubusercontent.com/alvrui/SDK-IA/main/sdkia.sh
+
 #!/bin/bash
 
 # SDK-IA Management Script
@@ -79,7 +81,8 @@ wait_for_port() {
 # Function to check service health
 check_health() {
     local port=$1
-    local endpoint=$2
+   
+ local endpoint=$2
     local service_name=$3
     
     if curl -s --max-time 3 "http://127.0.0.1:$port$endpoint" > /dev/null 2>&1; then
@@ -131,7 +134,8 @@ start_services() {
         fi
         cd "$SDKIA_ROOT/python" || return 1
         nohup "$SDKIA_ROOT/python/venv/bin/python" -m secretario.main > "$PYTHON_LOG" 2>&1 &
-        echo $! > "$PYTHON_PID_FILE"
+        echo $! > "$PYTHO
+N_PID_FILE"
         echo -e " ${GREEN}Started${NC} (PID: $!)"
     fi
     
@@ -163,7 +167,7 @@ start_services() {
     echo "========================================"
     sleep 5  # Wait for services to fully initialize
     check_health 9090 "/api/v1/internal/health" "Rust Backend"
-    check_health 9000 "/api/v1/internal/health" "Python Secretario"
+    check_health 9000 "/api/v1/agents/health" "Python Secretario"
     
     # Check UI with different approach (Vite doesn't always respond to health check)
     if curl -s --max-time 3 "http://127.0.0.1:3000/" > /dev/null 2>&1; then
@@ -183,7 +187,8 @@ start_services() {
     echo "  Access URLs:"
     echo "  - UI:       http://localhost:3000/"
     echo "  - Rust API: http://localhost:9090/api/v1/internal/health"
-    echo "  - Python API: http://localhost:9000/api/v1/internal/health"
+    echo "  - Python API: http://local
+host:9000/api/v1/internal/health"
     echo ""
     echo "  Log files:"
     echo "  - Rust:   $RUST_LOG"
@@ -243,7 +248,8 @@ stop_services() {
             echo -n "Stopping UI Frontend..."
             kill -9 "$ui_pid" 2>/dev/null
             rm -f "$UI_PID_FILE"
-            echo -e " ${GREEN}Stopped${NC}"
+            echo -e " ${G
+REEN}Stopped${NC}"
             services_stopped=$((services_stopped + 1))
         else
             echo -e "${YELLOW}⚠${NC} UI Frontend was not running (PID: $ui_pid)"
@@ -298,7 +304,8 @@ show_status() {
         if kill -0 "$python_pid" 2>/dev/null; then
             if port_in_use 9000; then
                 echo -e "${GREEN}✓${NC} Python Secretario (PID: $python_pid, Port: 9000) - RUNNING"
-                check_health 9000 "/api/v1/internal/health" "  → Health check"
+                check_heal
+th 9000 "/api/v1/internal/health" "  → Health check"
             else
                 echo -e "${RED}✗${NC} Python Secretario (PID: $python_pid, Port: 9000) - NOT RESPONDING"
             fi
@@ -363,7 +370,8 @@ case "$1" in
         echo "Usage: $0 {start|stop|status|restart}"
         echo ""
         echo "Commands:"
-        echo "  start   - Start all SDK-IA services (Rust, Python, UI)"
+        echo "  start   - Start all SDK-IA servi
+ces (Rust, Python, UI)"
         echo "  stop    - Stop all SDK-IA services"
         echo "  status  - Show status of all services"
         echo "  restart - Restart all services"
