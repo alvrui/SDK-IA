@@ -1,4 +1,3 @@
----
 import React, { useState, useEffect, useRef } from 'react';
 import { Agent } from '../../types/agent';
 import { sendAgentMessage, listAgents } from '../../api/agents';
