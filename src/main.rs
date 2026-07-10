@@ -34,14 +34,21 @@ async fn main() -> io::Result<()> {
     println!("Starting SDK-IA Rust backend on port 9090");
     
     // Initialize Hollywood Animal compatibility matrix
+    // Use flexible CSV reader to handle files with varying column counts
     let mut compatibility_matrix = CompatibilityMatrix::new();
     match compatibility_matrix.load_from_csv(
         "data/hollywood_animal/elements.csv",
         "data/hollywood_animal/compatibility_rules.csv"
     ) {
-        Ok(_) => println!("Hollywood Animal catalog loaded successfully: {} elements, {} rule sets",
-                          compatibility_matrix.elements.len(), compatibility_matrix.rules.len()),
-        Err(e) => eprintln!("Warning: Failed to load Hollywood Animal catalog: {}", e),
+        Ok(_) => {
+            println!("Hollywood Animal catalog loaded successfully: {} elements, {} rule sets",
+                      compatibility_matrix.elements.len(), compatibility_matrix.rules.len());
+        },
+        Err(e) => {
+            eprintln!("Warning: Failed to load Hollywood Animal catalog: {}", e);
+            eprintln!("Continuing without Hollywood Animal catalog. Some features may be limited.");
+            // Continue with empty catalog - server will still work
+        }
     }
     let compatibility_matrix = Arc::new(compatibility_matrix);
     
