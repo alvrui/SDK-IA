@@ -36,7 +36,7 @@ impl NarrativeService {
         narrative.metadata = metadata;
         
         // Create narrative in database first
-        let narrative_id = self.persistence.create_narrative(&narrative)?;
+        let narrative_id = self.persistence.create_narrative(&narrative).map_err(|e| e.to_string())?;
         
         // Calculate compatibility score based on themes
         let score = self.calculate_theme_compatibility(&narrative.theme_ids)?;
@@ -44,7 +44,7 @@ impl NarrativeService {
         narrative.id = narrative_id;
         
         // Update with compatibility score
-        self.persistence.update_narrative(&narrative)?;
+        self.persistence.update_narrative(&narrative).map_err(|e| e.to_string())?;
         
         Ok(narrative_id)
     }
@@ -88,7 +88,7 @@ impl NarrativeService {
         element: &StoryElement,
     ) -> Result<(), String> {
         // Create the story element
-        self.persistence.create_story_element(element)?;
+        self.persistence.create_story_element(element).map_err(|e| e.to_string())?;
         
         // Recalculate compatibility for the narrative
         self.recalculate_narrative_compatibility(narrative_id)?;
@@ -99,14 +99,14 @@ impl NarrativeService {
     /// Recalculate compatibility score for a narrative based on all its story elements
     pub fn recalculate_narrative_compatibility(&self, narrative_id: Uuid) -> Result<(), String> {
         // Get all story elements for this narrative
-        let elements = self.persistence.list_story_elements_by_narrative(&narrative_id)?;
+        let elements = self.persistence.list_story_elements_by_narrative(&narrative_id).map_err(|e| e.to_string())?;
         
         if elements.is_empty() {
             // If no elements, set to neutral score
-            let mut narrative = self.persistence.get_narrative(&narrative_id)?
+            let mut narrative = self.persistence.get_narrative(&narrative_id).map_err(|e| e.to_string())?
                 .ok_or("Narrative not found")?;
             narrative.compatibility_score = 0.5;
-            self.persistence.update_narrative(&narrative)?;
+            self.persistence.update_narrative(&narrative).map_err(|e| e.to_string())?;
             return Ok(());
         }
         
@@ -137,11 +137,11 @@ impl NarrativeService {
         };
         
         // Update narrative with new compatibility score
-        let mut narrative = self.persistence.get_narrative(&narrative_id)?
+        let mut narrative = self.persistence.get_narrative(&narrative_id).map_err(|e| e.to_string())?
             .ok_or("Narrative not found")?;
         narrative.compatibility_score = score;
         narrative.context_summary = self.generate_context_summary(&elements);
-        self.persistence.update_narrative(&narrative)?;
+        self.persistence.update_narrative(&narrative).map_err(|e| e.to_string())?;
         
         Ok(())
     }
@@ -197,7 +197,7 @@ impl NarrativeService {
 
     /// Validate all story elements in a narrative
     pub fn validate_narrative_elements(&self, narrative_id: Uuid) -> Result<Vec<String>, String> {
-        let elements = self.persistence.list_story_elements_by_narrative(&narrative_id)?;
+        let elements = self.persistence.list_story_elements_by_narrative(&narrative_id).map_err(|e| e.to_string())?;
         let mut errors = Vec::new();
         
         for element in &elements {
@@ -214,19 +214,19 @@ impl NarrativeService {
 
     /// Get narrative with all its story elements
     pub fn get_narrative_with_elements(&self, narrative_id: Uuid) -> Result<(Narrative, Vec<StoryElement>), String> {
-        let narrative = self.persistence.get_narrative(&narrative_id)?
+        let narrative = self.persistence.get_narrative(&narrative_id).map_err(|e| e.to_string())?
             .ok_or("Narrative not found")?;
-        let elements = self.persistence.list_story_elements_by_narrative(&narrative_id)?;
+        let elements = self.persistence.list_story_elements_by_narrative(&narrative_id).map_err(|e| e.to_string())?;
         Ok((narrative, elements))
     }
 
     /// Get all narratives for a project with their elements
     pub fn get_project_narratives_with_elements(&self, project_id: Uuid) -> Result<Vec<(Narrative, Vec<StoryElement>)>, String> {
-        let narratives = self.persistence.list_narratives_by_project(&project_id)?;
+        let narratives = self.persistence.list_narratives_by_project(&project_id).map_err(|e| e.to_string())?;
         let mut results = Vec::new();
         
         for narrative in &narratives {
-            let elements = self.persistence.list_story_elements_by_narrative(&narrative.id)?;
+            let elements = self.persistence.list_story_elements_by_narrative(&narrative.id).map_err(|e| e.to_string())?;
             results.push((narrative.clone(), elements));
         }
         

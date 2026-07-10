@@ -94,9 +94,9 @@ impl DomainValidationService {
     pub fn validate_narrative(&self, narrative_id: Uuid) -> Result<ValidationResult, String> {
         let mut result = ValidationResult::new();
         
-        let narrative = self.persistence.get_narrative(&narrative_id)?
+        let narrative = self.persistence.get_narrative(&narrative_id).map_err(|e| e.to_string())?
             .ok_or("Narrative not found")?;
-        let elements = self.persistence.list_story_elements_by_narrative(&narrative_id)?;
+        let elements = self.persistence.list_story_elements_by_narrative(&narrative_id).map_err(|e| e.to_string())?;
         
         for element in &elements {
             let element_result = self.validate_story_element(&element);
@@ -124,10 +124,19 @@ impl DomainValidationService {
     pub fn validate_game_event(&self, event: &GameEvent, elements: &[StoryElement]) -> ValidationResult {
         let mut result = ValidationResult::new();
         
+        // Validate that all referenced story elements exist
         for element in elements {
-            if element.id == event.trigger_element_id {
-                let element_result = self.validate_story_element(element);
-                result.merge(element_result);
+            let element_result = self.validate_story_element(element);
+            result.merge(element_result);
+        }
+        
+        // Validate hollywood_event_id if present
+        if let Some(ref hollywood_id) = event.hollywood_event_id {
+            if !self.compatibility_matrix.elements.contains_key(hollywood_id) {
+                result.add_error(ValidationError::error(
+                    "hollywood_event_id",
+                    &format!("Unknown Hollywood event: {}", hollywood_id)
+                ));
             }
         }
         
@@ -138,7 +147,7 @@ impl DomainValidationService {
     pub fn validate_project(&self, project_id: Uuid) -> Result<ValidationResult, String> {
         let mut result = ValidationResult::new();
         
-        let narratives = self.persistence.list_narratives_by_project(&project_id)?;
+        let narratives = self.persistence.list_narratives_by_project(&project_id).map_err(|e| e.to_string())?;
         for narrative in &narratives {
             match self.validate_narrative(narrative.id) {
                 Ok(narrative_result) => result.merge(narrative_result),

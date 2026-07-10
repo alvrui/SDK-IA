@@ -189,12 +189,12 @@ pub async fn list_projects(
 ) -> impl Responder {
     let tags: Option<Vec<String>> = query.tags.as_deref().map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
     
-    let status: Option<ProjectStatus> = query.status.and_then(|s| ProjectStatus::from_str(&s).ok());
+    let status: Option<ProjectStatus> = query.status.as_ref().and_then(|s| ProjectStatus::from_str(s).ok());
 
     match data.persistence.search_projects(
         query.name.as_deref(),
         query.author.as_deref(),
-        status,
+        status.as_ref().cloned(),
         tags.as_deref(),
         query.page,
         query.page_size,
@@ -203,7 +203,7 @@ pub async fn list_projects(
             let total = data.persistence.count_projects_search(
                 query.name.as_deref(),
                 query.author.as_deref(),
-                status,
+                status.as_ref().cloned(),
                 tags.as_deref(),
             ).unwrap_or(0);
             
