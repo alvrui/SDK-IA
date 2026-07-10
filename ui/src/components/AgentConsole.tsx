@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Agent, AgentStatus, AgentCreate, AgentUpdate, ChatMessage } from '../types/agent';
 import { listAgents, createAgent, updateAgent, deleteAgent, sendAgentMessage, getAgentServiceStatus, getModelDisplayName, getStatusColor, getStatusText, getDefaultAgent } from '../api/agents';
+import './AgentConsole.css';
 
 export default function AgentConsole() {
   const [agents, setAgents] = useState<Agent[]>([]);

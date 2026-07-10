@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom';
 import { listAgents } from '../../api/agents';
 import { listProjects } from '../../api/projects';
 import { listNarratives } from '../../api/narratives';
+import LoadingSpinner from './LoadingSpinner';
+import ErrorDisplay from './ErrorDisplay';
 import './Dashboard.css';
 
 interface StatCardProps {
   title: string;
   value: number | string;
-  icon?: string;
+  icon: string;
   link?: string;
   color?: string;
 }
@@ -16,7 +18,9 @@ interface StatCardProps {
 function StatCard({ title, value, icon, link, color = '#38bdf8' }: StatCardProps) {
   const content = (
     <div className="stat-card" style={{ borderTopColor: color }}>
-      {icon && <div className="stat-icon" style={{ backgroundColor: color }}>{icon}</div>}
+      <div className="stat-icon" style={{ backgroundColor: color }}>
+        {icon}
+      </div>
       <div className="stat-info">
         <span className="stat-value">{value}</span>
         <span className="stat-title">{title}</span>
@@ -24,7 +28,13 @@ function StatCard({ title, value, icon, link, color = '#38bdf8' }: StatCardProps
     </div>
   );
 
-  return link ? <Link to={link}>{content}</Link> : <>{content}</>;
+  return link ? (
+    <Link to={link} className="stat-card-link">
+      {content}
+    </Link>
+  ) : (
+    <>{content}</>
+  );
 }
 
 export default function Dashboard() {
@@ -39,6 +49,8 @@ export default function Dashboard() {
   useEffect(() => {
     const loadStats = async () => {
       try {
+        setStats(prev => ({ ...prev, loading: true, error: null }));
+
         const [agentsResponse, projectsResponse, narrativesResponse] = await Promise.all([
           listAgents().catch(() => ({ agents: [] })),
           listProjects().catch(() => ({ projects: [] })),
@@ -52,11 +64,11 @@ export default function Dashboard() {
           loading: false,
           error: null
         });
-      } catch (error) {
+      } catch (err) {
         setStats({
           ...stats,
           loading: false,
-          error: 'Error al cargar estadísticas'
+          error: err instanceof Error ? err.message : 'Failed to load statistics'
         });
       }
     };
@@ -67,7 +79,7 @@ export default function Dashboard() {
   if (stats.loading) {
     return (
       <div className="dashboard">
-        <div className="loading">Cargando estadísticas...</div>
+        <LoadingSpinner />
       </div>
     );
   }
@@ -75,90 +87,93 @@ export default function Dashboard() {
   if (stats.error) {
     return (
       <div className="dashboard">
-        <div className="error">{stats.error}</div>
+        <ErrorDisplay message={stats.error} onRetry={() => window.location.reload()} />
       </div>
     );
   }
 
   return (
     <div className="dashboard">
-      <h2>Panel de Control - Cadiz12 SDK</h2>
-      <p className="subtitle">Gestión unificada de agentes, proyectos y narrativas</p>
+      <div className="dashboard-header">
+        <h2>Cadiz12 SDK Dashboard</h2>
+        <p>Unified management for agents, projects, and narratives</p>
+      </div>
 
       <div className="stats-grid">
         <StatCard
-          title="Agentes"
+          title="Agents"
           value={stats.agents}
           icon="🤖"
           link="/agents"
           color="#38bdf8"
         />
         <StatCard
-          title="Proyectos"
+          title="Projects"
           value={stats.projects}
           icon="📁"
           link="/projects"
           color="#10b981"
         />
         <StatCard
-          title="Narrativas"
+          title="Narratives"
           value={stats.narratives}
           icon="📜"
           link="/narratives"
           color="#8b5cf6"
         />
         <StatCard
-          title="Salud del Sistema"
-          value="✅ Operativo"
+          title="System"
+          value="✅ All systems operational"
           icon="⚡"
           color="#22c55e"
         />
       </div>
 
       <div className="quick-actions">
-        <h3>Acciones Rápidas</h3>
+        <h3>Quick Actions</h3>
         <div className="actions-grid">
           <Link to="/agents" className="action-card">
             <div className="action-icon">🤖</div>
-            <div className="action-text">
-              <strong>Gestionar Agentes</strong>
-              <span>Configurar y chatear con agentes Mistral</span>
+            <div className="action-content">
+              <strong>Manage Agents</strong>
+              <span>Configure and communicate with Mistral AI agents</span>
             </div>
           </Link>
           <Link to="/projects" className="action-card">
             <div className="action-icon">📁</div>
-            <div className="action-text">
-              <strong>Gestionar Proyectos</strong>
-              <span>Crear y administrar proyectos Cadiz12</span>
+            <div className="action-content">
+              <strong>Manage Projects</strong>
+              <span>Create and organize your Cadiz12 projects</span>
             </div>
           </Link>
           <Link to="/narratives" className="action-card">
             <div className="action-icon">📜</div>
-            <div className="action-text">
-              <strong>Generar Narrativas</strong>
-              <span>Crear historias con Hollywood Animal</span>
+            <div className="action-content">
+              <strong>Generate Narratives</strong>
+              <span>Create stories with Hollywood Animal validation</span>
             </div>
           </Link>
         </div>
       </div>
 
-      <div className="recent-activity">
-        <h3>Actividad Reciente</h3>
-        <div className="activity-list">
-          <div className="activity-item">
-            <span className="activity-icon">🔄</span>
-            <span className="activity-text">Sistema inicializado correctamente</span>
-            <span className="activity-time">Hace unos momentos</span>
+      <div className="system-info">
+        <h3>System Information</h3>
+        <div className="info-grid">
+          <div className="info-item">
+            <span className="info-label">Backend Status</span>
+            <span className="info-value status-healthy">Healthy</span>
           </div>
-          <div className="activity-item">
-            <span className="activity-icon">🤖</span>
-            <span className="activity-text">{stats.agents} agentes disponibles</span>
-            <span className="activity-time">Cargados</span>
+          <div className="info-item">
+            <span className="info-label">Python Service</span>
+            <span className="info-value status-healthy">Healthy</span>
           </div>
-          <div className="activity-item">
-            <span className="activity-icon">📊</span>
-            <span className="activity-text">Todos los servicios operativos</span>
-            <span className="activity-time">Verificado</span>
+          <div className="info-item">
+            <span className="info-label">UI Version</span>
+            <span className="info-value">v0.1.0</span>
+          </div>
+          <div className="info-item">
+            <span className="info-label">Last Updated</span>
+            <span className="info-value">{new Date().toLocaleDateString()}</span>
           </div>
         </div>
       </div>

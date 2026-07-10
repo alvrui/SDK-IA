@@ -31,7 +31,7 @@ function App() {
         </main>
         
         <footer className="footer">
-          <p>Cadiz12 SDK v0.1.0</p>
+          <p>Cadiz12 SDK v0.1.0 - Unified Agent Console for Cadiz12</p>
         </footer>
       </div>
     </Router>
