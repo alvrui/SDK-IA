@@ -62,7 +62,7 @@ app.add_middleware(
 )
 
 # Initialize services
-mistral_client = MistralClient(api_key=settings.MISTRAL_API_KEY)
+mistral_client = MistralClient()
 storage = ConversationStorage(database_path=settings.DATABASE_PATH)
 agent_manager = AgentManager(storage=storage, client=mistral_client)
 
