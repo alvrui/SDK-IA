@@ -3,7 +3,7 @@ Main FastAPI application for Secretario module
 """
 
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -52,10 +52,10 @@ app = FastAPI(
     openapi_url="/api/v1/internal/openapi.json",
 )
 
-# CORS configuration
+# Configurar CORS - Permitir todo para desarrollo
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:9090", "http://127.0.0.1:9090"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

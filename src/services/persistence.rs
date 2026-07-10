@@ -215,6 +215,37 @@ impl PersistenceService {
         Ok(projects)
     }
 
+    pub fn get_all_projects(&self) -> Result<Vec<Project>> {
+        let mut conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, description, author, created_at, updated_at, version, status, tags, settings, metadata 
+             FROM projects ORDER BY created_at DESC"
+        )?;
+
+        let mut projects = Vec::new();
+        let mut rows = stmt.query_map([], |row| {
+            Ok(Project {
+                id: Uuid::parse_str(row.get::<_, String>(0)?.as_str()).unwrap(),
+                name: row.get(1)?,
+                description: row.get(2)?,
+                author: row.get(3)?,
+                created_at: Self::parse_datetime_utc(&row.get::<_, String>(4)?),
+                updated_at: Self::parse_datetime_utc(&row.get::<_, String>(5)?),
+                version: row.get(6)?,
+                status: serde_json::from_str(&format!("{:?}", row.get::<_, String>(7)?)).unwrap_or(ProjectStatus::Draft),
+                tags: serde_json::from_str(&row.get::<_, String>(8)?).unwrap_or_default(),
+                settings: serde_json::from_str(&row.get::<_, String>(9)?).unwrap_or_default(),
+                metadata: serde_json::from_str(&row.get::<_, String>(10)?).unwrap_or_default(),
+            })
+        })?;
+
+        while let Some(row) = rows.next().transpose()? {
+            projects.push(row);
+        }
+
+        Ok(projects)
+    }
+
     pub fn update_project(&self, project: &Project) -> Result<()> {
         let tags_json = serde_json::to_string(&project.tags).unwrap_or("[]".to_string());
         let settings_json = serde_json::to_string(&project.settings).unwrap_or("{{}}".to_string());

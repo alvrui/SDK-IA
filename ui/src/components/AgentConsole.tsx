@@ -1,72 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { Agent, AgentStatus, AgentCreate, AgentUpdate, ChatMessage } from '../types/agent';
-import { listAgents, createAgent, updateAgent, deleteAgent, sendAgentMessage, getAgentServiceStatus, getModelDisplayName, getStatusColor, getStatusText, getDefaultAgent } from '../api/agents';
+import { useAgents } from '../hooks/useAgents';
+import { getModelDisplayName, getStatusColor, getStatusText, getDefaultAgent } from '../api/agents';
 import './AgentConsole.css';
 
 export default function AgentConsole() {
-  const [agents, setAgents] = useState<Agent[]>([]);
+  const {
+    agents,
+    loading: isLoading,
+    error,
+    serviceStatus,
+    fetchAgents,
+    createAgent: createAgentWrapper,
+    updateAgent: updateAgentWrapper,
+    deleteAgent: deleteAgentWrapper,
+    sendAgentMessage: sendMessageWrapper
+  } = useAgents();
+
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editAgent, setEditAgent] = useState<Partial<AgentCreate> & { id?: string; status?: string }>(getDefaultAgent());
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [messageInput, setMessageInput] = useState<string>('');
   const [isSending, setIsSending] = useState<boolean>(false);
-  const [serviceStatus, setServiceStatus] = useState<{ status: string; agent_count: number; active_agents: number } | null>(null);
 
   useEffect(() => {
-    loadAgents();
-    loadServiceStatus();
-  }, []);
-
-  const loadAgents = async () => {
-    try {
-      setIsLoading(true);
-      const response = await listAgents();
-      setAgents(response.agents);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load agents');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadServiceStatus = async () => {
-    try {
-      const status = await getAgentServiceStatus();
-      setServiceStatus({
-        status: status.status,
-        agent_count: status.agent_count,
-        active_agents: status.active_agents,
-      });
-    } catch (err) {
-      // Service might not be available
-    }
-  };
+    fetchAgents();
+  }, [fetchAgents]);
 
   const handleCreateAgent = async () => {
     try {
-      setIsLoading(true);
-      const newAgent = await createAgent(editAgent as AgentCreate);
-      setAgents([...agents, newAgent]);
+      await createAgentWrapper(editAgent as AgentCreate);
       setIsCreating(false);
       setEditAgent(getDefaultAgent());
-      setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create agent');
-    } finally {
-      setIsLoading(false);
+      // Error ya manejado por el hook
     }
   };
 
   const handleUpdateAgent = async () => {
     if (!selectedAgent) return;
-    
+
     try {
-      setIsLoading(true);
       const updateData: AgentUpdate = {
         name: editAgent.name,
         description: editAgent.description,
@@ -76,44 +52,35 @@ export default function AgentConsole() {
         max_tokens: editAgent.max_tokens,
         status: editAgent.status as AgentStatus,
       };
-      
-      const updatedAgent = await updateAgent(selectedAgent.id, updateData);
-      setAgents(agents.map(a => a.id === selectedAgent.id ? updatedAgent : a));
+
+      const updatedAgent = await updateAgentWrapper(selectedAgent.id, updateData);
       setSelectedAgent(updatedAgent);
       setIsEditing(false);
-      setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update agent');
-    } finally {
-      setIsLoading(false);
+      // Error ya manejado por el hook
     }
   };
 
   const handleDeleteAgent = async (agentId: string) => {
     if (!window.confirm('Are you sure you want to delete this agent?')) return;
-    
+
     try {
-      setIsLoading(true);
-      await deleteAgent(agentId);
-      setAgents(agents.filter(a => a.id !== agentId));
+      await deleteAgentWrapper(agentId);
       if (selectedAgent?.id === agentId) {
         setSelectedAgent(null);
         setChatMessages([]);
       }
-      setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete agent');
-    } finally {
-      setIsLoading(false);
+      // Error ya manejado por el hook
     }
   };
 
   const handleSendMessage = async () => {
     if (!selectedAgent || !messageInput.trim()) return;
-    
+
     try {
       setIsSending(true);
-      
+
       const userMessage: ChatMessage = {
         id: 'msg-' + Date.now(),
         role: 'user',
@@ -122,9 +89,9 @@ export default function AgentConsole() {
       };
       setChatMessages([...chatMessages, userMessage]);
       setMessageInput('');
-      
-      const response = await sendAgentMessage(selectedAgent.id, { content: messageInput });
-      
+
+      const response = await sendMessageWrapper(selectedAgent.id, { content: messageInput });
+
       const assistantMessage: ChatMessage = {
         id: response.id,
         role: 'assistant',
@@ -132,10 +99,8 @@ export default function AgentConsole() {
         timestamp: response.timestamp,
       };
       setChatMessages(prev => [...prev, assistantMessage]);
-      
-      setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send message');
+      // Error ya manejado por el hook
     } finally {
       setIsSending(false);
     }

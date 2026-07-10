@@ -1,75 +1,63 @@
 import { useState, useEffect, useCallback } from 'react';
-import apiClient, { Project, ApiResponse } from '../api/client';
+import { listProjects, createProject, deleteProject, Project, ProjectCreate } from '../api/projects';
 
-export const useProjects = () => {
+export function useProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchProjects = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
-      const response = await apiClient.getProjects();
-      if (response.status === 'success') setProjects(response.data || []);
-      else setError(response.error?.message || 'Failed to fetch projects');
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unknown error'); }
-    finally { setLoading(false); }
+      setLoading(true);
+      console.log('[useProjects] Fetching projects...');
+      const response = await listProjects();
+      console.log('[useProjects] Response:', response);
+      setProjects(response.projects || []);
+      setError(null);
+    } catch (err) {
+      console.error('[useProjects] Error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load projects');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const createProject = useCallback(async (projectData: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => {
-    setLoading(true);
-    setError(null);
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
+
+  const createProjectWrapper = async (project: ProjectCreate) => {
     try {
-      const response = await apiClient.createProject(projectData);
-      if (response.status === 'success') { setProjects(prev => [response.data!, ...prev]); return response.data; }
-      else { setError(response.error?.message || 'Failed to create project'); return null; }
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unknown error'); return null; }
-    finally { setLoading(false); }
-  }, []);
+      console.log('[useProjects] Creating project:', project);
+      const newProject = await createProject(project);
+      console.log('[useProjects] Created:', newProject);
+      setProjects([...projects, newProject]);
+      return newProject;
+    } catch (err) {
+      console.error('[useProjects] Create error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create project');
+      throw err;
+    }
+  };
 
-  const updateProject = useCallback(async (id: string, projectData: Partial<Project>) => {
-    setLoading(true);
-    setError(null);
+  const deleteProjectWrapper = async (id: string) => {
     try {
-      const response = await apiClient.updateProject(id, projectData);
-      if (response.status === 'success') { setProjects(prev => prev.map(p => p.id === id ? response.data! : p)); return response.data; }
-      else { setError(response.error?.message || 'Failed to update project'); return null; }
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unknown error'); return null; }
-    finally { setLoading(false); }
-  }, []);
+      console.log('[useProjects] Deleting project:', id);
+      await deleteProject(id);
+      setProjects(projects.filter(p => p.id !== id));
+    } catch (err) {
+      console.error('[useProjects] Delete error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete project');
+      throw err;
+    }
+  };
 
-  const deleteProject = useCallback(async (id: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await apiClient.deleteProject(id);
-      if (response.status === 'success') { setProjects(prev => prev.filter(p => p.id !== id)); return true; }
-      else { setError(response.error?.message || 'Failed to delete project'); return false; }
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unknown error'); return false; }
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { fetchProjects(); }, [fetchProjects]);
-  return { projects, loading, error, fetchProjects, createProject, updateProject, deleteProject };
-};
-
-export const useProject = (id: string) => {
-  const [project, setProject] = useState<Project | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchProject = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await apiClient.getProject(id);
-      if (response.status === 'success') setProject(response.data || null);
-      else setError(response.error?.message || 'Failed to fetch project');
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unknown error'); }
-    finally { setLoading(false); }
-  }, [id]);
-
-  useEffect(() => { if (id) fetchProject(); }, [id, fetchProject]);
-  return { project, loading, error, fetchProject };
-};
+  return {
+    projects,
+    loading,
+    error,
+    fetchProjects,
+    createProject: createProjectWrapper,
+    deleteProject: deleteProjectWrapper
+  };
+}

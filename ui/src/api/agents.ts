@@ -142,3 +142,6 @@ export function getStatusText(status: string): string {
   };
   return texts[status] || status;
 }
+
+// Re-export types
+export type { Agent, AgentCreate, AgentUpdate, AgentMessage as ChatMessage, AgentListResponse, AgentServiceStatus } from '../types/agent';

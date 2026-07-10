@@ -1,75 +1,114 @@
 import { useState, useEffect, useCallback } from 'react';
-import apiClient, { Agent, ApiResponse } from '../api/client';
+import {
+  listAgents,
+  createAgent,
+  updateAgent,
+  deleteAgent,
+  sendAgentMessage,
+  getAgentServiceStatus,
+  Agent,
+  AgentCreate,
+  AgentUpdate,
+  ChatMessage
+} from '../api/agents';
 
-export const useAgents = () => {
+export function useAgents() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [serviceStatus, setServiceStatus] = useState<any>(null);
 
   const fetchAgents = useCallback(async () => {
-    setLoading(true);
-    setError(null);
     try {
-      const response = await apiClient.getAgents();
-      if (response.status === 'success') setAgents(response.data || []);
-      else setError(response.error?.message || 'Failed to fetch agents');
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unknown error'); }
-    finally { setLoading(false); }
+      setLoading(true);
+      console.log('[useAgents] Fetching agents from:', process.env.NODE_ENV === 'development' ? 'http://localhost:9000/api/v1/agents' : '/api/v1/agents');
+      const response = await listAgents();
+      console.log('[useAgents] Response:', response);
+      setAgents(response.agents || []);
+      setError(null);
+    } catch (err) {
+      console.error('[useAgents] Error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load agents');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const createAgent = useCallback(async (agentData: Omit<Agent, 'id' | 'created_at'>) => {
-    setLoading(true);
-    setError(null);
+  const fetchServiceStatus = useCallback(async () => {
     try {
-      const response = await apiClient.createAgent(agentData);
-      if (response.status === 'success') { setAgents(prev => [response.data!, ...prev]); return response.data; }
-      else { setError(response.error?.message || 'Failed to create agent'); return null; }
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unknown error'); return null; }
-    finally { setLoading(false); }
+      const status = await getAgentServiceStatus();
+      console.log('[useAgents] Service status:', status);
+      setServiceStatus(status);
+    } catch (err) {
+      console.error('[useAgents] Service status error:', err);
+    }
   }, []);
 
-  const updateAgent = useCallback(async (id: string, agentData: Partial<Agent>) => {
-    setLoading(true);
-    setError(null);
+  useEffect(() => {
+    fetchAgents();
+    fetchServiceStatus();
+  }, [fetchAgents, fetchServiceStatus]);
+
+  const createAgentWrapper = async (agent: AgentCreate) => {
     try {
-      const response = await apiClient.updateAgent(id, agentData);
-      if (response.status === 'success') { setAgents(prev => prev.map(a => a.id === id ? response.data! : a)); return response.data; }
-      else { setError(response.error?.message || 'Failed to update agent'); return null; }
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unknown error'); return null; }
-    finally { setLoading(false); }
-  }, []);
+      console.log('[useAgents] Creating agent:', agent);
+      const newAgent = await createAgent(agent);
+      console.log('[useAgents] Created:', newAgent);
+      setAgents([...agents, newAgent]);
+      return newAgent;
+    } catch (err) {
+      console.error('[useAgents] Create error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create agent');
+      throw err;
+    }
+  };
 
-  const deleteAgent = useCallback(async (id: string) => {
-    setLoading(true);
-    setError(null);
+  const updateAgentWrapper = async (id: string, agent: AgentUpdate) => {
     try {
-      const response = await apiClient.deleteAgent(id);
-      if (response.status === 'success') { setAgents(prev => prev.filter(a => a.id !== id)); return true; }
-      else { setError(response.error?.message || 'Failed to delete agent'); return false; }
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unknown error'); return false; }
-    finally { setLoading(false); }
-  }, []);
+      console.log('[useAgents] Updating agent:', id, agent);
+      const updatedAgent = await updateAgent(id, agent);
+      console.log('[useAgents] Updated:', updatedAgent);
+      setAgents(agents.map(a => a.id === id ? updatedAgent : a));
+      return updatedAgent;
+    } catch (err) {
+      console.error('[useAgents] Update error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to update agent');
+      throw err;
+    }
+  };
 
-  useEffect(() => { fetchAgents(); }, [fetchAgents]);
-  return { agents, loading, error, fetchAgents, createAgent, updateAgent, deleteAgent };
-};
-
-export const useAgent = (id: string) => {
-  const [agent, setAgent] = useState<Agent | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchAgent = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const deleteAgentWrapper = async (id: string) => {
     try {
-      const response = await apiClient.getAgent(id);
-      if (response.status === 'success') setAgent(response.data || null);
-      else setError(response.error?.message || 'Failed to fetch agent');
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unknown error'); }
-    finally { setLoading(false); }
-  }, [id]);
+      console.log('[useAgents] Deleting agent:', id);
+      await deleteAgent(id);
+      setAgents(agents.filter(a => a.id !== id));
+    } catch (err) {
+      console.error('[useAgents] Delete error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to delete agent');
+      throw err;
+    }
+  };
 
-  useEffect(() => { if (id) fetchAgent(); }, [id, fetchAgent]);
-  return { agent, loading, error, fetchAgent };
-};
+  const sendMessageWrapper = async (agentId: string, message: { content: string; conversation_id?: string }): Promise<ChatMessage> => {
+    try {
+      console.log('[useAgents] Sending message to:', agentId, message);
+      return await sendAgentMessage(agentId, message);
+    } catch (err) {
+      console.error('[useAgents] Send message error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to send message');
+      throw err;
+    }
+  };
+
+  return {
+    agents,
+    loading,
+    error,
+    serviceStatus,
+    fetchAgents,
+    createAgent: createAgentWrapper,
+    updateAgent: updateAgentWrapper,
+    deleteAgent: deleteAgentWrapper,
+    sendAgentMessage: sendMessageWrapper
+  };
+}

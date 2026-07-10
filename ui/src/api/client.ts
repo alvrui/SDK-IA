@@ -1,4 +1,5 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9090';
+const BASE_URL = 'http://localhost:9090';
+const PYTHON_URL = 'http://localhost:9000';
 
 interface ApiResponse<T> {
   status: 'success' | 'error';
@@ -54,8 +55,9 @@ interface GenerationResult {
 const apiClient = {
   baseURL: BASE_URL,
   
-  async request<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>> {
-    const url = `${this.baseURL}${endpoint}`;
+  async request<T>(endpoint: string, options?: RequestInit & { python?: boolean }): Promise<ApiResponse<T>> {
+    const baseUrl = options?.python ? PYTHON_URL : this.baseURL;
+    const url = `${baseUrl}${endpoint}`;
     try {
       const response = await fetch(url, {
         ...options,
@@ -83,16 +85,16 @@ const apiClient = {
   async deleteProject(id: string): Promise<ApiResponse<void>> {
     return this.request(`/api/v1/internal/projects/${id}`, { method: 'DELETE' });
   },
-  async getAgents(): Promise<ApiResponse<Agent[]>> { return this.request('/api/v1/internal/agents'); },
-  async getAgent(id: string): Promise<ApiResponse<Agent>> { return this.request(`/api/v1/internal/agents/${id}`); },
+  async getAgents(): Promise<ApiResponse<Agent[]>> { return this.request('/api/v1/agents', { python: true }); },
+  async getAgent(id: string): Promise<ApiResponse<Agent>> { return this.request(`/api/v1/agents/${id}`, { python: true }); },
   async createAgent(agent: Omit<Agent, 'id' | 'created_at'>): Promise<ApiResponse<Agent>> {
-    return this.request('/api/v1/internal/agents', { method: 'POST', body: JSON.stringify(agent) });
+    return this.request('/api/v1/agents', { method: 'POST', body: JSON.stringify(agent), python: true });
   },
   async updateAgent(id: string, agent: Partial<Agent>): Promise<ApiResponse<Agent>> {
-    return this.request(`/api/v1/internal/agents/${id}`, { method: 'PUT', body: JSON.stringify(agent) });
+    return this.request(`/api/v1/agents/${id}`, { method: 'PUT', body: JSON.stringify(agent), python: true });
   },
   async deleteAgent(id: string): Promise<ApiResponse<void>> {
-    return this.request(`/api/v1/internal/agents/${id}`, { method: 'DELETE' });
+    return this.request(`/api/v1/agents/${id}`, { method: 'DELETE', python: true });
   },
   async getNarratives(projectId: string): Promise<ApiResponse<Narrative[]>> {
     return this.request(`/api/v1/internal/projects/${projectId}/narratives`);
@@ -123,16 +125,16 @@ const apiClient = {
     if (agentId) params.append('agent_id', agentId);
     if (projectId) params.append('project_id', projectId);
     const query = params.toString() ? `?${params.toString()}` : '';
-    return this.request(`/api/v1/internal/conversations${query}`);
+    return this.request(`/api/v1/conversations${query}`, { python: true });
   },
   async getConversation(conversationId: string): Promise<ApiResponse<Conversation>> {
-    return this.request(`/api/v1/internal/conversations/${conversationId}`);
+    return this.request(`/api/v1/conversations/${conversationId}`, { python: true });
   },
   async createConversation(agentId: string, projectId: string, title: string): Promise<ApiResponse<Conversation>> {
-    return this.request('/api/v1/internal/conversations', { method: 'POST', body: JSON.stringify({ agent_id: agentId, project_id: projectId, title }) });
+    return this.request('/api/v1/conversations', { method: 'POST', body: JSON.stringify({ agent_id: agentId, project_id: projectId, title }), python: true });
   },
   async sendMessage(conversationId: string, content: string, role: 'user' | 'system' = 'user'): Promise<ApiResponse<Message>> {
-    return this.request(`/api/v1/internal/conversations/${conversationId}/messages`, { method: 'POST', body: JSON.stringify({ content, role }) });
+    return this.request(`/api/v1/conversations/${conversationId}/messages`, { method: 'POST', body: JSON.stringify({ content, role }), python: true });
   },
   async healthCheck(): Promise<ApiResponse<{ status: string; version: string; timestamp: string }>> {
     return this.request('/api/v1/internal/health');

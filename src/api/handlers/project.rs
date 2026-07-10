@@ -182,44 +182,25 @@ pub async fn get_project(
     }
 }
 
-/// List all projects with pagination
 pub async fn list_projects(
-    data: web::Data<Arc<AppData>>,
-    query: web::Query<SearchProjectsQuery>,
+    data: web::Data<AppData>,
 ) -> impl Responder {
-    let tags: Option<Vec<String>> = query.tags.as_deref().map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
-    
-    let status: Option<ProjectStatus> = query.status.as_ref().and_then(|s| ProjectStatus::from_str(s).ok());
-
-    match data.persistence.search_projects(
-        query.name.as_deref(),
-        query.author.as_deref(),
-        status.as_ref().cloned(),
-        tags.as_deref(),
-        query.page,
-        query.page_size,
-    ) {
+    match data.persistence.get_all_projects() {
         Ok(projects) => {
-            let total = data.persistence.count_projects_search(
-                query.name.as_deref(),
-                query.author.as_deref(),
-                status.as_ref().cloned(),
-                tags.as_deref(),
-            ).unwrap_or(0);
-            
+            // Convertir proyectos a JSON serializable
+            let projects_json: Vec<_> = projects.into_iter().map(|p| serde_json::json!({
+                "id": p.id,
+                "name": p.name,
+                "description": p.description,
+                "created_at": p.created_at,
+                "updated_at": p.updated_at,
+                "status": p.status
+            })).collect();
             HttpResponse::Ok().json(serde_json::json!({
-                "status": "success",
-                "data": projects,
-                "meta": {
-                    "page": query.page,
-                    "page_size": query.page_size,
-                    "total": total,
-                    "total_pages": (total as f64 / query.page_size as f64).ceil() as i64
-                }
+                "projects": projects_json
             }))
-        }
+        },
         Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({
-            "status": "error",
             "error": e.to_string()
         })),
     }
