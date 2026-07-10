@@ -1,6 +1,11 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './styles/main.css';
+// Componentes funcionales
+import AgentConsole from './components/AgentConsole';
+import ProjectList from './components/Project/ProjectList';
+import NarrativeGenerator from './components/Generation/NarrativeGenerator';
+import Dashboard from './components/Common/Dashboard';
 
 function App() {
   return (
@@ -36,8 +41,7 @@ function App() {
 function HomePage() {
   return (
     <div className="page">
-      <h2>Welcome to Cadiz12 SDK</h2>
-      <p>Unified application for narrative and event generation.</p>
+      <Dashboard />
     </div>
   );
 }
@@ -45,8 +49,7 @@ function HomePage() {
 function ProjectsPage() {
   return (
     <div className="page">
-      <h2>Projects</h2>
-      <p>Manage your Cadiz12 projects here.</p>
+      <ProjectList />
     </div>
   );
 }
@@ -54,8 +57,7 @@ function ProjectsPage() {
 function AgentsPage() {
   return (
     <div className="page">
-      <h2>Agents</h2>
-      <p>Manage Mistral AI agents here.</p>
+      <AgentConsole />
     </div>
   );
 }
@@ -63,8 +65,7 @@ function AgentsPage() {
 function NarrativesPage() {
   return (
     <div className="page">
-      <h2>Narratives</h2>
-      <p>Generate and manage narratives here.</p>
+      <NarrativeGenerator />
     </div>
   );
 }

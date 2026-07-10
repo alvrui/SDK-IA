@@ -2,6 +2,7 @@
 // Main entry point for the application
 
 use actix_web::{web as aw_web, App, HttpServer, Responder, HttpResponse};
+use actix_cors::Cors;
 use std::io;
 use std::sync::Arc;
 
@@ -78,6 +79,14 @@ async fn main() -> io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(app_data.clone())
+            .wrap(
+                Cors::default()
+                    .allow_any_origin()
+                    .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"])
+                    .allowed_headers(vec![actix_web::http::header::AUTHORIZATION, actix_web::http::header::ACCEPT])
+                    .allowed_header(actix_web::http::header::CONTENT_TYPE)
+                    .max_age(3600),
+            )
             .route("/api/v1/internal/health", actix_web::web::get().to(health_check))
             .configure(api::routes::configure)
             .configure(web::configure)
