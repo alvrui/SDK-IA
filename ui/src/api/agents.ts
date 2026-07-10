@@ -2,7 +2,7 @@
 
 import { Agent, AgentCreate, AgentUpdate, AgentMessage, AgentMessageCreate, AgentConversation, AgentListResponse, AgentServiceStatus } from '../types/agent';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:9090';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:9000';
 
 // Helper to handle API errors
 export async function handleApiError(response: Response): Promise<never> {

@@ -1363,7 +1363,30 @@ pub fn configure_project_routes(cfg: &mut web::ServiceConfig) {
             .route("/matrix", web::get().to(get_compatibility_matrix))
     );
     
-    // Project routes
+    // Project routes - para el frontend React
+    cfg.service(
+        web::resource("/projects")
+            .route(web::get().to(list_projects))
+            .route(web::post().to(create_project)),
+    )
+    .service(
+        web::resource("/projects/{id}")
+            .route(web::get().to(get_project))
+            .route(web::put().to(update_project))
+            .route(web::delete().to(delete_project)),
+    )
+    .service(
+        web::resource("/narratives")
+            .route(web::get().to(list_narratives)),
+    )
+    .service(
+        web::resource("/narratives/{id}")
+            .route(web::get().to(get_narrative))
+            .route(web::put().to(update_narrative))
+            .route(web::delete().to(delete_narrative)),
+    );
+    
+    // Internal API routes (existing)
     cfg.service(
         web::scope("/api/v1/internal/projects")
             .route("", web::post().to(create_project))
