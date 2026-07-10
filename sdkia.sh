@@ -1,4 +1,3 @@
-url: https://raw.githubusercontent.com/alvrui/SDK-IA/main/sdkia.sh
 
 #!/bin/bash
 
@@ -167,7 +166,7 @@ N_PID_FILE"
     echo "========================================"
     sleep 5  # Wait for services to fully initialize
     check_health 9090 "/api/v1/internal/health" "Rust Backend"
-    check_health 9000 "/api/v1/agents/health" "Python Secretario"
+    check_health 9000 "/api/v1/internal/health" "Python Secretario"
     
     # Check UI with different approach (Vite doesn't always respond to health check)
     if curl -s --max-time 3 "http://127.0.0.1:3000/" > /dev/null 2>&1; then
