@@ -1,3 +1,5 @@
+url: https://raw.githubusercontent.com/alvrui/SDK-IA/main/python/secretario/agents.py
+
 """
 Agent management for Secretario module
 """
@@ -13,7 +15,7 @@ from .mistral_client import MistralClient
 
 logger = structlog.get_logger()
 
-router = APIRouter(prefix="/agents", tags=["agents"])
+router = APIRouter(tags=["agents"])
 
 
 class AgentManager:
@@ -57,7 +59,8 @@ class AgentManager:
         
         agent = await self.storage.get_agent(agent_id)
         if not agent:
-            logger.warning("Agent not found", agent_id=agent_id)
+            logger.warni
+ng("Agent not found", agent_id=agent_id)
             return None
         
         if agent_data.name is not None:
@@ -109,7 +112,8 @@ class AgentManager:
         
         # Get response from Mistral
         response_content = await self.client.chat(
-            model=agent.model,
+   
+         model=agent.model,
             messages=[
                 {"role": "system", "content": agent.system_prompt},
                 {"role": "user", "content": message_data.content},
@@ -160,7 +164,8 @@ async def create_agent_endpoint(
     return agent
 
 
-@router.get("/{agent_id}", response_model=Agent)
+@router.get("/{
+agent_id}", response_model=Agent)
 async def get_agent_endpoint(
     agent_id: str,
     manager: AgentManager = Depends(get_agent_manager),
