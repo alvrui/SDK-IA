@@ -43,10 +43,19 @@ export default function ProjectForm({ project, onSubmit, onClose }: ProjectFormP
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    await onSubmit({
-      ...formData,
-      version: project?.version || '1.0.0',
-    });
+    
+    // For creation, omit status and version (backend will set defaults)
+    // For update, include all fields
+    const submitData: Omit<Project, 'id' | 'created_at' | 'updated_at' | 'version'> = {
+      name: formData.name,
+      description: formData.description,
+      author: formData.author,
+      status: formData.status,
+      tags: formData.tags,
+      metadata: formData.metadata,
+    };
+    
+    await onSubmit(submitData);
   };
 
   const handleChange = (field: string, value: string) => {
