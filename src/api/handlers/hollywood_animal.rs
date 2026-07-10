@@ -105,7 +105,6 @@ async fn search_hollywood_elements(
             let matches_category = category.map_or(true, |c| format!("{:?}", e.category).to_lowercase() == c.to_lowercase());
             let matches_search = search_term.map_or(true, |term| {
                 e.id.contains(term) || 
-                e.name.contains(term) ||
                 e.subtype.contains(term)
             });
             matches_category && matches_search

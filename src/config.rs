@@ -41,7 +41,7 @@ impl AppConfig {
             }
         }
 
-        let settings = config::Config::try_from(&builder.build()?)?;
+        let settings = builder.build()?;
         Ok(settings.try_deserialize()?)
     }
 }

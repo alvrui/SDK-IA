@@ -102,7 +102,7 @@ impl PythonClient {
         if status.is_success() {
             let json: Value = response.json()
                 .await
-                .map_err(PythonClientError::SerdeError)?;
+                .map_err(PythonClientError::ReqwestError)?;
             Ok(json)
         } else {
             let error_text = response.text().await.unwrap_or_default();

@@ -189,12 +189,12 @@ pub async fn list_projects(
 ) -> impl Responder {
     let tags: Option<Vec<String>> = query.tags.as_deref().map(|s| s.split(',').map(|s| s.trim().to_string()).collect());
     
-    let status: Option<ProjectStatus> = query.status.as_deref().and_then(|s| ProjectStatus::from_str(s).ok());
+    let status: Option<ProjectStatus> = query.status.and_then(|s| ProjectStatus::from_str(&s).ok());
 
     match data.persistence.search_projects(
         query.name.as_deref(),
         query.author.as_deref(),
-        status.as_deref(),
+        status,
         tags.as_deref(),
         query.page,
         query.page_size,
@@ -203,7 +203,7 @@ pub async fn list_projects(
             let total = data.persistence.count_projects_search(
                 query.name.as_deref(),
                 query.author.as_deref(),
-                status.as_deref(),
+                status,
                 tags.as_deref(),
             ).unwrap_or(0);
             
@@ -265,7 +265,7 @@ pub async fn update_project(
                     );
                     
                     // Apply version bump
-                    VersioningService::apply_project_version_bump(&mut project, change_type);
+                    VersioningService::apply_project_version_bump(&mut project, change_type.clone());
 
                     match data.persistence.update_project(&project) {
                         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
@@ -304,7 +304,7 @@ pub async fn delete_project(
 ) -> impl Responder {
     match Uuid::parse_str(&project_id.into_inner()) {
         Ok(id) => {
-            match data.persistence.delete_project(&id) {
+            match Arc::clone(&data.persistence).delete_project(&id) {
                 Ok(_) => HttpResponse::Ok().json(serde_json::json!({
                     "status": "success",
                     "message": "Project and all related data deleted successfully"
@@ -353,7 +353,7 @@ pub async fn create_narrative(
                     // Bump project version (MINOR change for adding narrative)
                     if let Ok(Some(mut project)) = data.persistence.get_project(&project_id_uuid) {
                         let change_type = VersionChangeType::Minor;
-                        VersioningService::apply_project_version_bump(&mut project, change_type);
+                        VersioningService::apply_project_version_bump(&mut project, change_type.clone());
                         if let Err(e) = data.persistence.update_project(&project) {
                             eprintln!("Failed to update project version: {}", e);
                         }
@@ -517,7 +517,7 @@ pub async fn update_narrative(
                     );
                     
                     // Apply version bump
-                    VersioningService::apply_narrative_version_bump(&mut narrative, change_type);
+                    VersioningService::apply_narrative_version_bump(&mut narrative, change_type.clone());
 
                     // Recalculate compatibility score
                     if let Err(e) = data.narrative_service.recalculate_narrative_compatibility(id) {
@@ -567,13 +567,13 @@ pub async fn delete_narrative(
                 _ => None,
             };
             
-            match data.persistence.delete_narrative(&id) {
+            match Arc::clone(&data.persistence).delete_narrative(&id) {
                 Ok(_) => {
                     // Bump project version (MINOR change for removing narrative)
                     if let Some(project_id) = project_id {
                         if let Ok(Some(mut project)) = data.persistence.get_project(&project_id) {
                             let change_type = VersionChangeType::Minor;
-                            VersioningService::apply_project_version_bump(&mut project, change_type);
+                            VersioningService::apply_project_version_bump(&mut project, change_type.clone());
                             if let Err(e) = data.persistence.update_project(&project) {
                                 eprintln!("Failed to update project version: {}", e);
                             }
@@ -640,7 +640,7 @@ pub async fn create_story_element(
                     // Bump narrative version (MINOR change for adding element)
                     if let Ok(Some(mut narrative)) = data.persistence.get_narrative(&narrative_id_uuid) {
                         let change_type = VersionChangeType::Minor;
-                        VersioningService::apply_narrative_version_bump(&mut narrative, change_type);
+                        VersioningService::apply_narrative_version_bump(&mut narrative, change_type.clone());
                         if let Err(e) = data.persistence.update_narrative(&narrative) {
                             eprintln!("Failed to update narrative version: {}", e);
                         }
@@ -749,7 +749,7 @@ pub async fn list_story_elements_by_type(
     
     match (Uuid::parse_str(&narrative_id), StoryElementType::from_str(&element_type)) {
         (Ok(narrative_id_uuid), Ok(element_type_enum)) => {
-            match data.persistence.list_story_elements_by_type(&narrative_id_uuid, element_type_enum) {
+            match data.persistence.list_story_elements_by_type(&narrative_id_uuid, element_type_enum.clone()) {
                 Ok(elements) => HttpResponse::Ok().json(serde_json::json!({
                     "status": "success",
                     "data": elements,
@@ -858,7 +858,7 @@ pub async fn delete_story_element(
                         // Bump narrative version (MINOR change for removing element)
                         if let Ok(Some(mut narrative)) = data.persistence.get_narrative(&narrative_id) {
                             let change_type = VersionChangeType::Minor;
-                            VersioningService::apply_narrative_version_bump(&mut narrative, change_type);
+                            VersioningService::apply_narrative_version_bump(&mut narrative, change_type.clone());
                             if let Err(e) = data.persistence.update_narrative(&narrative) {
                                 eprintln!("Failed to update narrative version: {}", e);
                             }
@@ -1262,7 +1262,7 @@ pub async fn validate_narrative(
 ) -> impl Responder {
     match Uuid::parse_str(&narrative_id.into_inner()) {
         Ok(id) => {
-            match data.validation_service.validate_narrative(id) {
+            match data.validation_service.validate_project(id) {
                 Ok(result) => {
                     if result.valid {
                         HttpResponse::Ok().json(serde_json::json!({
