@@ -9,8 +9,16 @@ interface ApiResponse<T> {
 }
 
 interface Project {
-  id: string; name: string; description: string;
-  created_at: string; updated_at: string; status: 'draft' | 'active' | 'archived';
+  id: string;
+  name: string;
+  description: string;
+  author: string;
+  version: string;
+  status: 'draft' | 'active' | 'archived';
+  tags: string[];
+  metadata: Record<string, string>;
+  created_at: string;
+  updated_at: string;
 }
 interface Agent {
   id: string; name: string; model: string; description: string;
@@ -78,7 +86,7 @@ const apiClient = {
   // Rust backend endpoints (port 9090)
   async getProjects(): Promise<ApiResponse<Project[]>> { return this.request('/api/v1/internal/projects'); },
   async getProject(id: string): Promise<ApiResponse<Project>> { return this.request(`/api/v1/internal/projects/${id}`); },
-  async createProject(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<ApiResponse<Project>> {
+  async createProject(project: Omit<Project, 'id' | 'created_at' | 'updated_at' | 'version' | 'author'>): Promise<ApiResponse<Project>> {
     return this.request('/api/v1/internal/projects', { method: 'POST', body: JSON.stringify(project) });
   },
   async updateProject(id: string, project: Partial<Project>): Promise<ApiResponse<Project>> {
