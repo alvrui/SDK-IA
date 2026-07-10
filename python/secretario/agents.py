@@ -1,4 +1,3 @@
-url: https://raw.githubusercontent.com/alvrui/SDK-IA/main/python/secretario/agents.py
 
 """
 Agent management for Secretario module
