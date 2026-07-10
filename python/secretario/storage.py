@@ -1,4 +1,4 @@
-'""'
+"""
 Conversation storage for Secretario module
 """
 

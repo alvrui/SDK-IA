@@ -1,4 +1,4 @@
-'""'
+"""
 Mistral API client for Secretario module
 """
 

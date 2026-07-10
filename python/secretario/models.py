@@ -1,4 +1,4 @@
-'""'
+"""
 Data models for Secretario module
 """
 

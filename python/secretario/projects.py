@@ -1,4 +1,4 @@
-'""'
+"""
 Project management for Secretario module
 Handles project-related operations and proxies to Rust backend when needed
 """

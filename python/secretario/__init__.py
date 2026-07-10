@@ -1,4 +1,4 @@
-'""'
+"""
 Secretario Module for Mistral Agent Management
 
 This module provides functionality for managing Mistral AI agents,

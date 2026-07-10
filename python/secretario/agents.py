@@ -1,4 +1,4 @@
-'""'
+"""
 Agent management for Secretario module
 """
 

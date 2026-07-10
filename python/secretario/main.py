@@ -1,10 +1,9 @@
-'""'
+"""
 Main FastAPI application for Secretario module
 """
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import logging
 import structlog
 
 from .agents import AgentManager, router as agents_router
