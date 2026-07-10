@@ -3,21 +3,40 @@ import { useProjects } from '../../hooks';
 import { Button, LoadingSpinner, ErrorDisplay, Modal } from '../Common';
 import ProjectForm from './ProjectForm';
 import ProjectCard from './ProjectCard';
+import { Project } from '../../api/client';
 
 export default function ProjectList() {
-  const { projects, loading, error, fetchProjects, createProject, deleteProject } = useProjects();
+  const { projects, loading, error, fetchProjects, createProject, updateProject, deleteProject } = useProjects();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const handleCreate = async (data) => {
     await createProject(data);
+    await fetchProjects();
+    setIsModalOpen(false);
+  };
+
+  const handleUpdate = async (id: string, data) => {
+    await updateProject(id, data);
+    await fetchProjects();
     setIsModalOpen(false);
   };
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this project?')) {
       await deleteProject(id);
+      await fetchProjects();
     }
+  };
+
+  const handleEdit = (project: Project) => {
+    setSelectedProject(project);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedProject(null);
   };
 
   return (
@@ -37,14 +56,18 @@ export default function ProjectList() {
           <ProjectCard
             key={project.id}
             project={project}
-            onEdit={() => { setSelectedProject(project); setIsModalOpen(true); }}
+            onEdit={() => handleEdit(project)}
             onDelete={() => handleDelete(project.id)}
           />
         ))}
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={selectedProject ? 'Edit Project' : 'Create Project'}>
-        <ProjectForm project={selectedProject} onSubmit={handleCreate} onClose={() => setIsModalOpen(false)} />
+      <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={selectedProject ? 'Edit Project' : 'Create Project'}>
+        <ProjectForm 
+          project={selectedProject} 
+          onSubmit={selectedProject ? (data) => handleUpdate(selectedProject.id, data) : handleCreate}
+          onClose={handleCloseModal} 
+        />
       </Modal>
     </div>
   );
