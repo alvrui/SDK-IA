@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secretario de Agentes - Cádiz12</title>
+    <style>
+        :root {
+            --bg: #111827;
+            --panel: #172033;
+            --panel-2: #1f2a40;
+            --panel-3: #24324c;
+            --border: #334155;
+            --text: #e5edf7;
+            --muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-2: #0ea5e9;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --shadow: 0 16px 40px rgba(0,0,0,0.28);
+            --radius: 14px;
+        }
+        [data-theme="light"] {
+            --bg: #eef2f7;
+            --panel: #ffffff;
+            --panel-2: #f8fafc;
+            --panel-3: #eef4fb;
+            --border: #d6deea;
+            --text: #142033;
+            --muted: #5b6b83;
+            --accent: #0369a1;
+            --accent-2: #0284c7;
+            --success: #15803d;
+            --danger: #b91c1c;
+            --warning: #b45309;
+            --shadow: 0 16px 40px rgba(15,23,42,0.10);
+        }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: linear-gradient(180deg, var(--bg), color-mix(in srgb, var(--bg) 88%, black));
+            color: var(--text);
+        }
+        .app {
+            display: grid;
+            grid-template-columns: 320px minmax(0, 1fr) 360px;
+            grid-template-rows: auto 1fr;
+            height: 100vh;
+            gap: 16px;
+            padding: 16px;
+        }
+        .topbar {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: color-mix(in srgb, var(--panel) 86%, transparent);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+        }
+        .brand { display: flex; align-items: center; gap: 12px; }
+        .brand-mark {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            display: grid;
+            place-items: center;
+            color: white;
+            font-weight: 800;
+        }
+        .brand-text h1 {
+            margin: 0;
+            font-size: 18px;
+            line-height: 1.1;
+        }
+        .brand-text p {
+            margin: 4px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .panel {
+            min-height: 0;
+            background: color-mix(in srgb, var(--panel) 90%, transparent);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .panel-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+            background: color-mix(in srgb, var(--panel-2) 92%, transparent);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .panel-header h2,
+        .panel-header h3 {
+            margin: 0;
+            font-size: 15px;
+        }
+        .panel-header p {
+            margin: 4px 0 0;
+            color: var(--muted);
+            font-size: 12px;
+        }
+        .sidebar, .inspector { min-height: 0; }
+        .sidebar-body, .inspector-body, .chat-body { padding: 14px; overflow: auto; }
+        .chat-body {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 96%, transparent), color-mix(in srgb, var(--panel-2) 96%, transparent));
+        }
+        .search, .input, textarea, select {
+            width: 100%;
+            border: 1px solid var(--border);
+            background: var(--panel-2);
+            color: var(--text);
+            border-radius: 12px;
+            padding: 11px 12px;
+            outline: none;
+        }
+        textarea {
+            min-height: 160px;
+            resize: vertical;
+            line-height: 1.45;
+        }
+        .input:focus, textarea:focus, select:focus, .search:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+        }
+        .button {
+            border: 1px solid var(--border);
+            background: var(--panel-2);
+            color: var(--text);
+            border-radius: 12px;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .button.primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: white;
+            border-color: transparent;
+        }
+        .button.danger { color: #fff; background: color-mix(in srgb, var(--danger) 85%, black); border-color: transparent; }
+        .button.ghost { background: transparent; }
+        .button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .agent-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .agent-card {
+            border: 1px solid var(--border);
+            background: var(--panel-2);
+            border-radius: 14px;
+            padding: 12px;
+            cursor: pointer;
+            transition: transform .12s ease, border-color .12s ease, background .12s ease;
+        }
+        .agent-card:hover { transform: translateY(-1px); border-color: var(--accent); }
+        .agent-card.active { background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); border-color: var(--accent); }
+        .agent-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .agent-name { font-weight: 700; }
+        .agent-meta { margin-top: 8px; color: var(--muted); font-size: 12px; display: grid; gap: 4px; }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            border: 1px solid var(--border);
+            background: var(--panel-3);
+            color: var(--muted);
+        }
+        .badge.success { color: #d1fae5; background: color-mix(in srgb, var(--success) 28%, var(--panel-3)); border-color: color-mix(in srgb, var(--success) 40%, var(--border)); }
+        .badge.error { color: #fee2e2; background: color-mix(in srgb, var(--danger) 28%, var(--panel-3)); border-color: color-mix(in srgb, var(--danger) 40%, var(--border)); }
+        .chat-shell {
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            min-height: 0;
+        }
+        .chat-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 0 14px 14px;
+            border-bottom: 1px solid var(--border);
+        }
+        .message {
+            max-width: min(880px, 92%);
+            border-radius: 16px;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            white-space: pre-wrap;
+            word-break: break-word;
+            box-shadow: 0 10px 24px rgba(0,0,0,0.10);
+        }
+        .message.user {
+            align-self: flex-end;
+            background: color-mix(in srgb, var(--accent) 16%, var(--panel-2));
+            border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+        }
+        .message.agent {
+            align-self: flex-start;
+            background: var(--panel-2);
+        }
+        .message.error {
+            align-self: stretch;
+            max-width: 100%;
+            background: color-mix(in srgb, var(--danger) 10%, var(--panel-2));
+            border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+        }
+        .message-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+        .composer {
+            padding: 14px;
+            border-top: 1px solid var(--border);
+            background: color-mix(in srgb, var(--panel-2) 95%, transparent);
+            display: grid;
+            gap: 12px;
+        }
+        .composer-actions, .row, .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .stat {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--panel-2);
+            padding: 12px;
+        }
+        .stat label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+        .stat strong { font-size: 18px; }
+        .empty {
+            padding: 18px;
+            border: 1px dashed var(--border);
+            border-radius: 14px;
+            color: var(--muted);
+            background: color-mix(in srgb, var(--panel-2) 80%, transparent);
+        }
+        .form-stack { display: grid; gap: 10px; }
+        .status-line {
+            font-size: 12px;
+            color: var(--muted);
+            min-height: 18px;
+        }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+        .hr { height: 1px; background: var(--border); margin: 14px 0; }
+        .small { font-size: 12px; color: var(--muted); }
+        @media (max-width: 1180px) {
+            .app { grid-template-columns: 280px minmax(0, 1fr); }
+            .inspector { grid-column: 1 / -1; max-height: 360px; }
+        }
+        @media (max-width: 860px) {
+            .app { grid-template-columns: 1fr; grid-template-rows: auto auto minmax(320px, 1fr) auto; height: auto; min-height: 100vh; }
+            .topbar, .sidebar, .chat, .inspector { grid-column: 1; }
+            .sidebar, .chat, .inspector { min-height: 320px; }
+            .message { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <header class="topbar">
+            <div class="brand">
+                <div class="brand-mark">S</div>
+                <div class="brand-text">
+                    <h1>Secretario de Agentes</h1>
+                    <p>Centralita operativa para agentes Mistral</p>
+                </div>
+            </div>
+            <div class="toolbar">
+                <button class="button ghost" id="theme-toggle" type="button">Cambiar tema</button>
+                <button class="button" id="refresh-all" type="button">Refrescar</button>
+                <span class="badge" id="connection-badge">Listo</span>
+            </div>
+        </header>
+
+        <aside class="panel sidebar">
+            <div class="panel-header">
+                <div>
+                    <h2>Agentes</h2>
+                    <p>Selecciona, filtra y administra tu pool</p>
+                </div>
+                <span class="badge" id="agent-count">0</span>
+            </div>
+            <div class="sidebar-body">
+                <input class="search" id="agent-search" type="search" placeholder="Buscar agente...">
+                <div class="agent-list" id="agent-list"></div>
+            </div>
+        </aside>
+
+        <main class="panel chat">
+            <div class="panel-header">
+                <div>
+                    <h2 id="chat-title">Sin agente seleccionado</h2>
+                    <p id="chat-subtitle">Selecciona un agente para ver el historial y enviar mensajes</p>
+                </div>
+                <div class="toolbar-group">
+                    <button class="button" id="reset-conversation" type="button">Nueva conversación</button>
+                    <button class="button" id="copy-agent-id" type="button">Copiar ID</button>
+                </div>
+            </div>
+            <div class="chat-shell">
+                <div class="chat-meta" id="chat-meta"></div>
+                <div class="chat-body" id="chat-body">
+                    <div class="empty">No hay conversación cargada todavía.</div>
+                </div>
+                <div class="composer">
+                    <textarea id="mensaje" placeholder="Escribe el mensaje para el agente seleccionado...&#10;&#10;Ctrl + Enter para enviar"></textarea>
+                    <div class="composer-actions">
+                        <button class="button primary" id="send-button" type="button">Enviar mensaje</button>
+                        <button class="button" id="clear-button" type="button">Limpiar</button>
+                        <label class="badge"><input id="force-new" type="checkbox" style="accent-color: var(--accent);"> Forzar conversación nueva</label>
+                    </div>
+                    <div class="status-line" id="status-line"></div>
+                </div>
+            </div>
+        </main>
+
+        <section class="panel inspector">
+            <div class="panel-header">
+                <div>
+                    <h3>Inspector</h3>
+                    <p>Configuración, persistencia y actividad reciente</p>
+                </div>
+            </div>
+            <div class="inspector-body">
+                <div class="stat-grid">
+                    <div class="stat"><label>Agentes</label><strong id="stat-agents">0</strong></div>
+                    <div class="stat"><label>Logs</label><strong id="stat-logs">0</strong></div>
+                    <div class="stat"><label>Estado</label><strong id="stat-status">Idle</strong></div>
+                    <div class="stat"><label>Conversación</label><strong id="stat-conversation" class="mono">-</strong></div>
+                </div>
+
+                <div class="form-stack">
+                    <input class="input" id="agent-name" type="text" placeholder="Nombre agente">
+                    <input class="input mono" id="agent-id" type="text" placeholder="ID agente">
+                    <input class="input mono" id="conversation-id" type="text" placeholder="Conversation ID opcional">
+                    <div class="row">
+                        <button class="button primary" id="save-agent" type="button">Guardar agente</button>
+                        <button class="button danger" id="delete-agent" type="button">Eliminar</button>
+                    </div>
+                    <div class="small">Guardar actualiza tanto la base persistente como el fichero de agentes.</div>
+                </div>
+
+                <div class="hr"></div>
+
+                <div>
+                    <h3 style="margin:0 0 10px 0; font-size:14px;">Última respuesta</h3>
+                    <div class="empty mono" id="last-response">Sin actividad reciente.</div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const state = {
+            agents: [],
+            logs: [],
+            selectedAgentName: '',
+            selectedAgentId: '',
+            selectedConversationId: '',
+            theme: 'dark',
+            filteredAgents: []
+        };
+
+        const els = {
+            agentList: document.getElementById('agent-list'),
+            agentCount: document.getElementById('agent-count'),
+            agentSearch: document.getElementById('agent-search'),
+            chatTitle: document.getElementById('chat-title'),
+            chatSubtitle: document.getElementById('chat-subtitle'),
+            chatMeta: document.getElementById('chat-meta'),
+            chatBody: document.getElementById('chat-body'),
+            message: document.getElementById('mensaje'),
+            sendButton: document.getElementById('send-button'),
+            clearButton: document.getElementById('clear-button'),
+            resetConversation: document.getElementById('reset-conversation'),
+            copyAgentId: document.getElementById('copy-agent-id'),
+            forceNew: document.getElementById('force-new'),
+            statusLine: document.getElementById('status-line'),
+            saveAgent: document.getElementById('save-agent'),
+            deleteAgent: document.getElementById('delete-agent'),
+            agentName: document.getElementById('agent-name'),
+            agentId: document.getElementById('agent-id'),
+            conversationId: document.getElementById('conversation-id'),
+            statAgents: document.getElementById('stat-agents'),
+            statLogs: document.getElementById('stat-logs'),
+            statStatus: document.getElementById('stat-status'),
+            statConversation: document.getElementById('stat-conversation'),
+            lastResponse: document.getElementById('last-response'),
+            refreshAll: document.getElementById('refresh-all'),
+            connectionBadge: document.getElementById('connection-badge'),
+            themeToggle: document.getElementById('theme-toggle')
+        };
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function formatDate(value) {
+            if (!value) return '—';
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return value;
+            return d.toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+        }
+
+        function statusBadgeClass(status) {
+            if (status === 'success') return 'badge success';
+            if (status === 'error') return 'badge error';
+            return 'badge';
+        }
+
+        async function api(url, options = {}) {
+            const response = await fetch(url, {
+                headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+                ...options
+            });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || 'Error de red');
+            }
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) return response.json();
+            return response.text();
+        }
+
+        async function cargarEstado() {
+            const data = await api('/estado');
+            state.selectedAgentName = data.selected_agent || '';
+            state.theme = data.theme || 'dark';
+            document.documentElement.setAttribute('data-theme', state.theme);
+        }
+
+        async function persistEstado(payload) {
+            await api('/estado', { method: 'POST', body: JSON.stringify(payload) });
+        }
+
+        async function cargarAgentes() {
+            const agentes = await api('/agentes');
+            state.agents = agentes;
+            state.filteredAgents = agentes;
+            if (!state.selectedAgentName && agentes.length) {
+                state.selectedAgentName = agentes[0].nombre;
+            }
+            syncSelectedAgentData();
+            renderAgents();
+            renderInspector();
+        }
+
+        async function cargarLogs() {
+            const agente = state.selectedAgentName ? `?agente=${encodeURIComponent(state.selectedAgentName)}` : '';
+            const logs = await api(`/logs${agente}`);
+            state.logs = logs;
+            renderConversation();
+            renderInspector();
+        }
+
+        function syncSelectedAgentData() {
+            const agente = state.agents.find(a => a.nombre === state.selectedAgentName) || null;
+            state.selectedAgentId = agente ? agente.agent_id : '';
+            state.selectedConversationId = agente ? (agente.conversation_id || '') : '';
+            if (agente) {
+                els.agentName.value = agente.nombre || '';
+                els.agentId.value = agente.agent_id || '';
+                els.conversationId.value = agente.conversation_id || '';
+            }
+        }
+
+        function renderAgents() {
+            const query = els.agentSearch.value.trim().toLowerCase();
+            state.filteredAgents = state.agents.filter(agent => {
+                const haystack = `${agent.nombre} ${agent.agent_id}`.toLowerCase();
+                return haystack.includes(query);
+            });
+            els.agentCount.textContent = String(state.agents.length);
+            els.statAgents.textContent = String(state.agents.length);
+            if (!state.filteredAgents.length) {
+                els.agentList.innerHTML = '<div class="empty">No hay agentes que coincidan con el filtro.</div>';
+                return;
+            }
+            els.agentList.innerHTML = state.filteredAgents.map(agent => {
+                const active = agent.nombre === state.selectedAgentName ? 'active' : '';
+                const badgeClass = statusBadgeClass(agent.ultimo_estado);
+                const estado = agent.ultimo_estado === 'idle' ? 'sin actividad' : agent.ultimo_estado;
+                return `
+                    <button class="agent-card ${active}" type="button" data-agent-name="${escapeHtml(agent.nombre)}">
+                        <div class="agent-title">
+                            <span class="agent-name">${escapeHtml(agent.nombre)}</span>
+                            <span class="${badgeClass}">${escapeHtml(estado)}</span>
+                        </div>
+                        <div class="agent-meta">
+                            <div class="mono">${escapeHtml(agent.agent_id)}</div>
+                            <div>Conversación: <span class="mono">${escapeHtml(agent.conversation_id || 'nueva')}</span></div>
+                            <div>Último uso: ${escapeHtml(formatDate(agent.last_used_at || agent.ultimo_timestamp))}</div>
+                        </div>
+                    </button>
+                `;
+            }).join('');
+            els.agentList.querySelectorAll('.agent-card').forEach(button => {
+                button.addEventListener('click', async () => {
+                    state.selectedAgentName = button.dataset.agentName || '';
+                    syncSelectedAgentData();
+                    await persistEstado({ selected_agent: state.selectedAgentName });
+                    renderAgents();
+                    await cargarLogs();
+                });
+            });
+        }
+
+        function renderConversation() {
+            syncSelectedAgentData();
+            if (!state.selectedAgentName) {
+                els.chatTitle.textContent = 'Sin agente seleccionado';
+                els.chatSubtitle.textContent = 'Selecciona un agente para trabajar';
+                els.chatMeta.innerHTML = '';
+                els.chatBody.innerHTML = '<div class="empty">No hay conversación cargada todavía.</div>';
+                return;
+            }
+            els.chatTitle.textContent = state.selectedAgentName;
+            els.chatSubtitle.textContent = `Conversation ID activa: ${state.selectedConversationId || 'nueva conversación'}`;
+            els.chatMeta.innerHTML = `
+                <span class="badge">Agente <span class="mono">${escapeHtml(state.selectedAgentId)}</span></span>
+                <span class="badge">Conversación <span class="mono">${escapeHtml(state.selectedConversationId || 'nueva')}</span></span>
+                <span class="badge">Mensajes ${state.logs.length}</span>
+            `;
+            if (!state.logs.length) {
+                els.chatBody.innerHTML = '<div class="empty">Aún no hay mensajes para este agente.</div>';
+                return;
+            }
+            els.chatBody.innerHTML = state.logs.map(log => {
+                const salida = typeof log.salida === 'string' ? log.salida : JSON.stringify(log.salida, null, 2);
+                const respuesta = typeof log.salida === 'object' && log.salida !== null
+                    ? (log.salida.text || log.salida.message || JSON.stringify(log.salida, null, 2))
+                    : salida;
+                const tipoClase = log.tipo === 'error' ? 'error' : 'agent';
+                return `
+                    <div class="message user">
+                        <div class="message-head"><strong>Tú</strong><span>${escapeHtml(formatDate(log.timestamp))}</span></div>
+                        <div>${escapeHtml(log.entrada)}</div>
+                    </div>
+                    <div class="message ${tipoClase}">
+                        <div class="message-head"><strong>${escapeHtml(log.agente)}</strong><span>${escapeHtml(log.tipo)}</span></div>
+                        <div>${escapeHtml(respuesta)}</div>
+                    </div>
+                `;
+            }).join('');
+            els.chatBody.scrollTop = els.chatBody.scrollHeight;
+        }
+
+        function renderInspector() {
+            els.statLogs.textContent = String(state.logs.length);
+            const ultimo = state.logs[state.logs.length - 1];
+            els.statStatus.textContent = ultimo ? (ultimo.tipo || 'idle') : 'Idle';
+            els.statConversation.textContent = state.selectedConversationId || '-';
+            if (!ultimo) {
+                els.lastResponse.textContent = 'Sin actividad reciente.';
+                return;
+            }
+            const salida = typeof ultimo.salida === 'string' ? ultimo.salida : JSON.stringify(ultimo.salida, null, 2);
+            els.lastResponse.textContent = salida;
+        }
+
+        function setBusy(busy, text = '') {
+            els.sendButton.disabled = busy;
+            els.saveAgent.disabled = busy;
+            els.deleteAgent.disabled = busy;
+            els.resetConversation.disabled = busy;
+            els.connectionBadge.textContent = busy ? 'Procesando' : 'Listo';
+            els.statusLine.textContent = text;
+        }
+
+        async function enviarMensaje() {
+            const agente = state.selectedAgentName;
+            const mensaje = els.message.value.trim();
+            if (!agente || !mensaje) {
+                els.statusLine.textContent = 'Selecciona un agente y escribe un mensaje.';
+                return;
+            }
+            setBusy(true, 'Enviando mensaje...');
+            try {
+                const payload = { agente, mensaje, force_new: els.forceNew.checked };
+                const resultado = await api('/enviar_mensaje', { method: 'POST', body: JSON.stringify(payload) });
+                els.message.value = '';
+                els.forceNew.checked = false;
+                if (resultado.status !== 'success') {
+                    throw new Error(resultado.message || 'Error al enviar mensaje');
+                }
+                await cargarAgentes();
+                await cargarLogs();
+                els.statusLine.textContent = 'Mensaje enviado correctamente.';
+            } catch (error) {
+                els.statusLine.textContent = `Error: ${error.message}`;
+            } finally {
+                setBusy(false, els.statusLine.textContent);
+            }
+        }
+
+        async function guardarAgente() {
+            const nombre = els.agentName.value.trim();
+            const agent_id = els.agentId.value.trim();
+            const conversation_id = els.conversationId.value.trim();
+            if (!nombre || !agent_id) {
+                els.statusLine.textContent = 'Nombre e ID de agente son obligatorios.';
+                return;
+            }
+            setBusy(true, 'Guardando agente...');
+            try {
+                await api('/agentes', {
+                    method: 'POST',
+                    body: JSON.stringify({ nombre, agent_id, conversation_id })
+                });
+                state.selectedAgentName = nombre;
+                await persistEstado({ selected_agent: nombre });
+                await cargarAgentes();
+                await cargarLogs();
+                els.statusLine.textContent = 'Agente guardado.';
+            } catch (error) {
+                els.statusLine.textContent = `Error guardando agente: ${error.message}`;
+            } finally {
+                setBusy(false, els.statusLine.textContent);
+            }
+        }
+
+        async function eliminarAgente() {
+            const agent_id = els.agentId.value.trim() || state.selectedAgentId;
+            if (!agent_id) {
+                els.statusLine.textContent = 'No hay agente seleccionado para eliminar.';
+                return;
+            }
+            if (!confirm('Se eliminará el agente seleccionado.')) return;
+            setBusy(true, 'Eliminando agente...');
+            try {
+                await api(`/agentes/${encodeURIComponent(agent_id)}`, { method: 'DELETE' });
+                state.selectedAgentName = '';
+                state.selectedAgentId = '';
+                state.selectedConversationId = '';
+                els.agentName.value = '';
+                els.agentId.value = '';
+                els.conversationId.value = '';
+                await persistEstado({ selected_agent: '' });
+                await cargarAgentes();
+                await cargarLogs();
+                els.statusLine.textContent = 'Agente eliminado.';
+            } catch (error) {
+                els.statusLine.textContent = `Error eliminando agente: ${error.message}`;
+            } finally {
+                setBusy(false, els.statusLine.textContent);
+            }
+        }
+
+        async function resetConversation() {
+            const agent_id = state.selectedAgentId;
+            if (!agent_id) {
+                els.statusLine.textContent = 'Selecciona un agente antes de resetear la conversación.';
+                return;
+            }
+            setBusy(true, 'Reseteando conversación...');
+            try {
+                await api('/agentes/reset_conversation', {
+                    method: 'POST',
+                    body: JSON.stringify({ agent_id })
+                });
+                await cargarAgentes();
+                await cargarLogs();
+                els.statusLine.textContent = 'Conversación reseteada. El siguiente mensaje abrirá una nueva.';
+            } catch (error) {
+                els.statusLine.textContent = `Error reseteando conversación: ${error.message}`;
+            } finally {
+                setBusy(false, els.statusLine.textContent);
+            }
+        }
+
+        async function toggleTheme() {
+            state.theme = state.theme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', state.theme);
+            await persistEstado({ theme: state.theme });
+        }
+
+        async function bootstrap() {
+            try {
+                await cargarEstado();
+                await cargarAgentes();
+                await cargarLogs();
+                els.connectionBadge.textContent = 'Conectado';
+            } catch (error) {
+                els.connectionBadge.textContent = 'Error';
+                els.statusLine.textContent = `Error inicializando interfaz: ${error.message}`;
+            }
+        }
+
+        els.agentSearch.addEventListener('input', renderAgents);
+        els.sendButton.addEventListener('click', enviarMensaje);
+        els.clearButton.addEventListener('click', () => { els.message.value = ''; els.message.focus(); });
+        els.saveAgent.addEventListener('click', guardarAgente);
+        els.deleteAgent.addEventListener('click', eliminarAgente);
+        els.resetConversation.addEventListener('click', resetConversation);
+        els.refreshAll.addEventListener('click', async () => {
+            await cargarAgentes();
+            await cargarLogs();
+            els.statusLine.textContent = 'Datos refrescados.';
+        });
+        els.copyAgentId.addEventListener('click', async () => {
+            if (!state.selectedAgentId) return;
+            try {
+                await navigator.clipboard.writeText(state.selectedAgentId);
+                els.statusLine.textContent = 'ID de agente copiado al portapapeles.';
+            } catch (_) {
+                els.statusLine.textContent = 'No se pudo copiar el ID.';
+            }
+        });
+        els.themeToggle.addEventListener('click', toggleTheme);
+        els.message.addEventListener('keydown', (event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+                event.preventDefault();
+                enviarMensaje();
+            }
+        });
+
+        bootstrap();
+    </script>
+</body>
+</html>
+

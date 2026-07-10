@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import './styles/main.css';
 // Componentes funcionales
-import AgentConsole from './components/AgentConsole';
+import FullChatInterface from './components/Chat/FullChatInterface';
 import ProjectList from './components/Project/ProjectList';
 import NarrativeGenerator from './components/Generation/NarrativeGenerator';
 import Dashboard from './components/Common/Dashboard';
@@ -56,8 +56,8 @@ function ProjectsPage() {
 
 function AgentsPage() {
   return (
-    <div className="page">
-      <AgentConsole />
+    <div className="page" style={{ height: 'calc(100vh - 120px)' }}>
+      <FullChatInterface />
     </div>
   );
 }

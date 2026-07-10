@@ -257,4 +257,16 @@ impl CompatibilityMatrix {
         types.sort();
         format!("{}_{}", types[0], types[1])
     }
+    
+    pub fn check_compatibility(&self, element1: &str, element2: &str) -> Option<f32> {
+        let elem1 = self.elements.get(element1);
+        let elem2 = self.elements.get(element2);
+        
+        if let (Some(e1), Some(e2)) = (elem1, elem2) {
+            let pair_type = self.get_pair_type(e1, e2);
+            self.rules.get(&pair_type).and_then(|inner_map| inner_map.get(element2).copied())
+        } else {
+            None
+        }
+    }
 }

@@ -1355,6 +1355,14 @@ pub async fn get_element_compatibility(
 // ==================== ROUTE CONFIGURATION ====================
 
 pub fn configure_project_routes(cfg: &mut web::ServiceConfig) {
+    // Hollywood Animal routes
+    cfg.service(
+        web::scope("/hollywood-animal")
+            .route("/elements", web::get().to(get_hollywood_elements))
+            .route("/compatibility/{element1}/{element2}", web::get().to(check_compatibility))
+            .route("/matrix", web::get().to(get_compatibility_matrix))
+    );
+    
     // Project routes
     cfg.service(
         web::scope("/api/v1/internal/projects")
@@ -1391,4 +1399,38 @@ pub fn configure_project_routes(cfg: &mut web::ServiceConfig) {
             .route("/hollywood/elements/{element_id}/validate", web::get().to(validate_hollywood_element))
             .route("/hollywood/compatibility", web::get().to(get_element_compatibility))
     );
+}
+
+// Hollywood Animal endpoints
+async fn get_hollywood_elements(
+    data: web::Data<AppData>,
+) -> impl Responder {
+    let matrix = &data.compatibility_matrix;
+    HttpResponse::Ok().json(matrix.elements.clone())
+}
+
+async fn check_compatibility(
+    data: web::Data<AppData>,
+    path: web::Path<(String, String)>,
+) -> impl Responder {
+    let (element1, element2) = path.into_inner();
+    let matrix = &data.compatibility_matrix;
+    match matrix.check_compatibility(&element1, &element2) {
+        Some(score) => HttpResponse::Ok().json(serde_json::json!({
+            "element1": element1,
+            "element2": element2,
+            "compatibility_score": score
+        })),
+        None => HttpResponse::NotFound().json(serde_json::json!({
+            "error": "Elements not found"
+        })),
+    }
+}
+
+async fn get_compatibility_matrix(
+    data: web::Data<AppData>,
+) -> impl Responder {
+    // Clone the matrix to avoid Arc serialization issues
+    let matrix = data.compatibility_matrix.clone();
+    HttpResponse::Ok().json(&*matrix)
 }

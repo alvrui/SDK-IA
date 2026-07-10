@@ -1,51 +1,124 @@
-import React, { useState } from 'react';
-import { useProjects } from '../../hooks';
-import { Button, LoadingSpinner, ErrorDisplay, Modal } from '../Common';
-import ProjectForm from './ProjectForm';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { listProjects, deleteProject, createProject, updateProject, Project } from '../../api/projects';
 import ProjectCard from './ProjectCard';
+import ProjectForm from './ProjectForm';
+import LoadingSpinner from '../Common/LoadingSpinner';
+import ErrorDisplay from '../Common/ErrorDisplay';
+import './ProjectList.css';
 
 export default function ProjectList() {
-  const { projects, loading, error, fetchProjects, createProject, deleteProject } = useProjects();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
 
-  const handleCreate = async (data) => {
-    await createProject(data);
-    setIsModalOpen(false);
-  };
+  useEffect(() => {
+    loadProjects();
+  }, []);
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this project?')) {
-      await deleteProject(id);
+  const loadProjects = async () => {
+    try {
+      setLoading(true);
+      const response = await listProjects();
+      setProjects(response.projects);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load projects');
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this project?')) return;
+    try {
+      await deleteProject(id);
+      setProjects(projects.filter(p => p.id !== id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete project');
+    }
+  };
+
+  const handleCreate = async (project: { name: string; description: string }) => {
+    try {
+      const newProject = await createProject(project);
+      setProjects([...projects, newProject]);
+      setShowForm(false);
+      setEditingProject(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create project');
+    }
+  };
+
+  const handleUpdate = async (id: string, project: { name: string; description: string }) => {
+    try {
+      const updatedProject = await updateProject(id, project);
+      setProjects(projects.map(p => p.id === id ? updatedProject : p));
+      setShowForm(false);
+      setEditingProject(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update project');
+    }
+  };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  if (error) {
+    return <ErrorDisplay message={error} onRetry={loadProjects} />;
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Projects</h1>
-        <Button onClick={() => { setSelectedProject(null); setIsModalOpen(true); }}>
-          Create Project
-        </Button>
+    <div className="project-list">
+      <div className="project-header">
+        <h2>Proyectos Cadiz12</h2>
+        <button
+          className="button primary"
+          onClick={() => {
+            setShowForm(true);
+            setEditingProject(null);
+          }}
+        >
+          + Nuevo Proyecto
+        </button>
       </div>
 
-      {loading && <LoadingSpinner text="Loading projects..." />}
-      {error && <ErrorDisplay error={error} onRetry={fetchProjects} />}
+      {showForm && (
+        <ProjectForm
+          project={editingProject}
+          onSubmit={editingProject ? handleUpdate : handleCreate}
+          onCancel={() => {
+            setShowForm(false);
+            setEditingProject(null);
+          }}
+        />
+      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {projects.map(project => (
-          <ProjectCard
-            key={project.id}
-            project={project}
-            onEdit={() => { setSelectedProject(project); setIsModalOpen(true); }}
-            onDelete={() => handleDelete(project.id)}
-          />
-        ))}
-      </div>
-
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={selectedProject ? 'Edit Project' : 'Create Project'}>
-        <ProjectForm project={selectedProject} onSubmit={handleCreate} onClose={() => setIsModalOpen(false)} />
-      </Modal>
+      {projects.length === 0 ? (
+        <div className="empty-state">
+          <p>No hay proyectos creados aún.</p>
+          <button className="button" onClick={() => setShowForm(true)}>
+            Crear primer proyecto
+          </button>
+        </div>
+      ) : (
+        <div className="projects-grid">
+          {projects.map(project => (
+            <ProjectCard
+              key={project.id}
+              project={project}
+              onEdit={() => {
+                setEditingProject(project);
+                setShowForm(true);
+              }}
+              onDelete={() => handleDelete(project.id)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
