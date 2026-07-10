@@ -2,7 +2,7 @@
 
 import { Agent, AgentCreate, AgentUpdate, AgentMessage, AgentMessageCreate, AgentConversation, AgentListResponse, AgentServiceStatus } from '../types/agent';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:9090';
+const API_BASE_URL = 'http://localhost:9000';
 
 // Helper to handle API errors
 export async function handleApiError(response: Response): Promise<never> {
@@ -13,7 +13,7 @@ export async function handleApiError(response: Response): Promise<never> {
 
 // Agent CRUD Operations
 export async function listAgents(): Promise<AgentListResponse> {
-  const response = await fetch(API_BASE_URL + '/api/v1/internal/agents');
+  const response = await fetch(API_BASE_URL + '/api/v1/agents');
   if (!response.ok) {
     await handleApiError(response);
   }
@@ -21,7 +21,7 @@ export async function listAgents(): Promise<AgentListResponse> {
 }
 
 export async function createAgent(agentData: AgentCreate): Promise<Agent> {
-  const response = await fetch(API_BASE_URL + '/api/v1/internal/agents', {
+  const response = await fetch(API_BASE_URL + '/api/v1/agents', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -35,7 +35,7 @@ export async function createAgent(agentData: AgentCreate): Promise<Agent> {
 }
 
 export async function getAgent(agentId: string): Promise<Agent> {
-  const response = await fetch(API_BASE_URL + '/api/v1/internal/agents/' + agentId);
+  const response = await fetch(API_BASE_URL + '/api/v1/agents/' + agentId);
   if (!response.ok) {
     await handleApiError(response);
   }
@@ -43,7 +43,7 @@ export async function getAgent(agentId: string): Promise<Agent> {
 }
 
 export async function updateAgent(agentId: string, agentData: AgentUpdate): Promise<Agent> {
-  const response = await fetch(API_BASE_URL + '/api/v1/internal/agents/' + agentId, {
+  const response = await fetch(API_BASE_URL + '/api/v1/agents/' + agentId, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -57,9 +57,10 @@ export async function updateAgent(agentId: string, agentData: AgentUpdate): Prom
 }
 
 export async function deleteAgent(agentId: string): Promise<void> {
-  const response = await fetch(API_BASE_URL + '/api/v1/internal/agents/' + agentId, {
+  const response = await fetch(API_BASE_URL + '/api/v1/agents/' + agentId, {
     method: 'DELETE',
   });
+
   if (!response.ok) {
     await handleApiError(response);
   }
@@ -67,7 +68,7 @@ export async function deleteAgent(agentId: string): Promise<void> {
 
 // Agent Message Operations
 export async function sendAgentMessage(agentId: string, messageData: AgentMessageCreate): Promise<AgentMessage> {
-  const response = await fetch(API_BASE_URL + '/api/v1/internal/agents/' + agentId + '/messages', {
+  const response = await fetch(API_BASE_URL + '/api/v1/agents/' + agentId + '/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -82,7 +83,7 @@ export async function sendAgentMessage(agentId: string, messageData: AgentMessag
 
 // Agent Conversation Operations
 export async function listAgentConversations(agentId: string): Promise<AgentConversation[]> {
-  const response = await fetch(API_BASE_URL + '/api/v1/internal/agents/' + agentId + '/conversations');
+  const response = await fetch(API_BASE_URL + '/api/v1/agents/' + agentId + '/conversations');
   if (!response.ok) {
     await handleApiError(response);
   }
@@ -91,7 +92,7 @@ export async function listAgentConversations(agentId: string): Promise<AgentConv
 
 // Service Status
 export async function getAgentServiceStatus(): Promise<AgentServiceStatus> {
-  const response = await fetch(API_BASE_URL + '/api/v1/internal/agents/status');
+  const response = await fetch(API_BASE_URL + '/api/v1/agents/status');
   if (!response.ok) {
     await handleApiError(response);
   }
